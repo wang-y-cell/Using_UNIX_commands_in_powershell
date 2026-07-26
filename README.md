@@ -132,7 +132,7 @@ find . -type f -name "*.ps1"
 提示符应类似：
 
 ```text
-wangy@windowsPS:F:\wy\windows_use_linux_order $
+windows@PS:F:\wy\windows_use_linux_order $
 ```
 
 （提示符中的用户名目前写死在脚本的 `prompt` 函数里，可按需自行修改。）
