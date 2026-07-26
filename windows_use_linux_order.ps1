@@ -212,10 +212,13 @@ function ls-horizontal {
         $i = 0
         foreach ($item in $items) {
             $rgb = Get-ItemColor $item
+            # Windows Mode：与 Linux 权限位同位置，如 d----- / -a---- / -ar--- 
+            $modeText = if ($null -ne $item.Mode -and $item.Mode -ne '') { $item.Mode } else { '------' }
             $timeText = $item.LastWriteTime.ToString('yyyy-MM-dd HH:mm')
             $sizeText = $sizeTexts[$i].PadLeft($sizeWidth)
             $i++
 
+            Write-Host "$modeText  " -ForegroundColor Blue -NoNewline
             Write-Host "$timeText  " -ForegroundColor Gray -NoNewline
             Write-Host "$sizeText  " -ForegroundColor DarkGray -NoNewline
             Write-RGB -Text $item.Name -R $rgb[0] -G $rgb[1] -B $rgb[2]
