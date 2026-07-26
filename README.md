@@ -1,6 +1,7 @@
 # windows_use_linux_order
 
 在 Windows PowerShell 中使用接近 Linux / Ubuntu 习惯的常用命令与终端体验。
+![参考](image/image.png)
 
 本项目通过一个 PowerShell 脚本（`windows_use_linux_order.ps1`），提供：
 

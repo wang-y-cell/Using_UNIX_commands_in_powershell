@@ -86,7 +86,7 @@ function Format-FileSize {
     )
 
     if ($null -eq $Bytes) {
-        $text = if ($HumanReadable) { '-' } else { '' }
+        $text = '-'
     } elseif (-not $HumanReadable) {
         $text = [string][long]$Bytes
     } else {
@@ -199,12 +199,22 @@ function ls-horizontal {
 
     # --- 长列表模式：ls -l / -lh / -al / -alh ---
     if ($longFormat) {
-        $sizeWidth = if ($humanReadable) { 6 } else { 12 }
+        # 先格式化全部大小，按最长文本定列宽，避免固定宽度留白过多
+        $sizeTexts = @(foreach ($item in $items) {
+            $sizeBytes = if ($item.PSIsContainer) { $null } else { $item.Length }
+            Format-FileSize -Bytes $sizeBytes -HumanReadable:$humanReadable
+        })
+        $sizeWidth = 1
+        foreach ($st in $sizeTexts) {
+            if ($st.Length -gt $sizeWidth) { $sizeWidth = $st.Length }
+        }
+
+        $i = 0
         foreach ($item in $items) {
             $rgb = Get-ItemColor $item
             $timeText = $item.LastWriteTime.ToString('yyyy-MM-dd HH:mm')
-            $sizeBytes = if ($item.PSIsContainer) { $null } else { $item.Length }
-            $sizeText = Format-FileSize -Bytes $sizeBytes -HumanReadable:$humanReadable -Width $sizeWidth
+            $sizeText = $sizeTexts[$i].PadLeft($sizeWidth)
+            $i++
 
             Write-Host "$timeText  " -ForegroundColor Gray -NoNewline
             Write-Host "$sizeText  " -ForegroundColor DarkGray -NoNewline
