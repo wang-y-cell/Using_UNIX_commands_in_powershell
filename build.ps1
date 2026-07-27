@@ -3,8 +3,9 @@
     将 src 安装到 $PROFILE 父目录下的 windows_use_linux_order，并写入 $PROFILE 加载路径。
 
 .DESCRIPTION
-    1. 复制仓库 src\ 全部文件到：$(Split-Path $PROFILE -Parent)\windows_use_linux_order\
-    2. 在 $PROFILE 中写入（或更新）受标记保护的加载块，逐文件点源加载各函数。
+    1. 若 $PROFILE 文件不存在则自动创建（终端醒目提示），并确保其父目录存在
+    2. 复制仓库 src\ 全部文件到：$(Split-Path $PROFILE -Parent)\windows_use_linux_order\
+    3. 在 $PROFILE 中写入（或更新）受标记保护的加载块，逐文件点源加载各函数。
 
 .EXAMPLE
     .\build.ps1
@@ -38,11 +39,30 @@ if (-not $profileDir) {
     throw "无法解析 `$PROFILE 父目录: $PROFILE"
 }
 
+# 若 $PROFILE 或其父目录不存在，自动创建（不用抛异常）
+$profileCreated = $false
+if (-not (Test-Path -LiteralPath $PROFILE)) {
+    if (-not (Test-Path -LiteralPath $profileDir)) {
+        New-Item -ItemType Directory -Path $profileDir -Force | Out-Null
+    }
+    New-Item -ItemType File -Path $PROFILE -Force | Out-Null
+    $profileCreated = $true
+}
+
 $installRoot = Join-Path $profileDir $InstallFolderName
 
 Write-Host "源码:     $srcRoot"
 Write-Host "安装目录: $installRoot"
 Write-Host "配置文件: $PROFILE"
+if ($profileCreated) {
+    Write-Host ''
+    Write-Host ('=' * 60) -ForegroundColor Yellow
+    Write-Host '  未找到 $PROFILE，已自动创建该文件：' -ForegroundColor Black -BackgroundColor Yellow
+    Write-Host "  $PROFILE" -ForegroundColor Black -BackgroundColor Yellow
+    Write-Host ('=' * 60) -ForegroundColor Yellow
+} else {
+    Write-Host '配置文件状态: 已存在（未新建）' -ForegroundColor DarkGray
+}
 Write-Host ''
 
 # --- 1. 复制 src 到安装目录 ---
@@ -92,15 +112,6 @@ $block.Add('Remove-Variable __wuloRoot -ErrorAction SilentlyContinue')
 $block.Add($markerEnd)
 
 # --- 4. 写入 / 更新 $PROFILE ---
-if (-not (Test-Path -LiteralPath $PROFILE)) {
-    $parent = Split-Path -Parent $PROFILE
-    if ($parent -and -not (Test-Path -LiteralPath $parent)) {
-        New-Item -ItemType Directory -Path $parent -Force | Out-Null
-    }
-    New-Item -ItemType File -Path $PROFILE -Force | Out-Null
-    Write-Host "已创建 `$PROFILE: $PROFILE"
-}
-
 $out = [System.Collections.Generic.List[string]]::new()
 $skip = $false
 $replaced = $false

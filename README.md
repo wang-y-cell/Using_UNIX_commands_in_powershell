@@ -29,18 +29,40 @@ git clone <你的仓库地址>
 cd windows_use_linux_order
 ```
 
-记住脚本的完整路径，例如：
+### 2. 永久安装（推荐：运行 build.ps1）
 
-```text
-F:\wy\windows_use_linux_order\windows_use_linux_order.ps1
-```
-
-### 2. 临时加载（当前会话）
-
-在 PowerShell 中执行：
+在仓库根目录执行：
 
 ```powershell
-. F:\wy\windows_use_linux_order\windows_use_linux_order.ps1
+.\build.ps1
+```
+
+`build.ps1` 会自动完成：
+
+1. 将 `src\` 复制到 `$PROFILE` 同级目录下的 `windows_use_linux_order\`
+2. 在 `$PROFILE` 中写入（或更新）受标记保护的加载块
+3. 若本机尚无 `$PROFILE` 文件，会**自动创建**，并在终端用醒目颜色提示
+
+安装完成后，**重新打开**一个 PowerShell 窗口即可生效。当前会话也可立即加载：
+
+```powershell
+. "$([IO.Path]::Combine((Split-Path $PROFILE -Parent), 'windows_use_linux_order', 'load.ps1'))"
+```
+
+再次运行 `.\build.ps1` 可覆盖安装目录并刷新 `$PROFILE` 中的加载块。
+
+### 3. 临时手动加载（当前会话）
+
+不写配置、只在当前窗口试用时，在仓库根目录执行：
+
+```powershell
+. .\src\load.ps1
+```
+
+或使用兼容入口：
+
+```powershell
+. .\windows_use_linux_order.ps1
 ```
 
 注意前面的点号 `.`（点源加载），这样函数和别名才会进入当前会话。
@@ -54,9 +76,11 @@ pwd
 find . -name "*.ps1"
 ```
 
-关闭该窗口后配置会失效；需要长期生效请看下一节。
+关闭该窗口后配置会失效。
 
-### 3. 永久加载（推荐：写入 PowerShell 配置文件）
+### 4. 手动写入 $PROFILE（可选）
+
+一般不必手写；优先使用上一节的 `build.ps1`。若你更想自己控制加载路径，可如下操作。
 
 先查看当前配置文件路径：
 
@@ -88,6 +112,12 @@ notepad $PROFILE
 在配置文件末尾添加一行（路径改成你的实际路径）：
 
 ```powershell
+. "F:\wy\windows_use_linux_order\src\load.ps1"
+```
+
+或：
+
+```powershell
 . "F:\wy\windows_use_linux_order\windows_use_linux_order.ps1"
 ```
 
@@ -96,10 +126,10 @@ notepad $PROFILE
 也可一行追加：
 
 ```powershell
-Add-Content -Path $PROFILE -Value '. "F:\wy\windows_use_linux_order\windows_use_linux_order.ps1"'
+Add-Content -Path $PROFILE -Value '. "F:\wy\windows_use_linux_order\src\load.ps1"'
 ```
 
-### 4. 若提示“无法加载，因为在此系统上禁止运行脚本”
+### 5. 若提示“无法加载，因为在此系统上禁止运行脚本”
 
 当前执行策略可能过严。可仅对当前用户放开（推荐）：
 
@@ -107,7 +137,7 @@ Add-Content -Path $PROFILE -Value '. "F:\wy\windows_use_linux_order\windows_use_
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
 
-然后重新打开 PowerShell，再加载脚本或依赖 `$PROFILE`。
+然后重新打开 PowerShell，再运行 `.\build.ps1` 或点源加载脚本。
 
 也可不改策略，仅对当前会话绕过：
 
@@ -118,7 +148,7 @@ powershell -ExecutionPolicy Bypass -NoExit -File "F:\wy\windows_use_linux_order\
 注意：`-File` 会在脚本结束后退出（除非加 `-NoExit`）；若希望函数留在交互会话里，仍建议用点源加载：
 
 ```powershell
-powershell -NoExit -Command ". 'F:\wy\windows_use_linux_order\windows_use_linux_order.ps1'"
+powershell -NoExit -Command ". 'F:\wy\windows_use_linux_order\src\load.ps1'"
 ```
 
 ## 验证是否生效
@@ -153,7 +183,11 @@ windows@PS:F:\wy\windows_use_linux_order $
 
 ## 卸载
 
-从 `$PROFILE` 中删除加载本脚本的那一行，保存后重新打开 PowerShell 即可。
+若曾用 `build.ps1` 安装：从 `$PROFILE` 中删除 `# >>> windows_use_linux_order BEGIN` 到 `# <<< windows_use_linux_order END` 整段，并可删除 `$PROFILE` 同级目录下的 `windows_use_linux_order\` 文件夹。
+
+若是手动写入的一行加载语句：删掉该行即可。
+
+保存后重新打开 PowerShell 生效。
 
 ## 许可证
 
