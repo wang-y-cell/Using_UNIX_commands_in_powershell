@@ -9,25 +9,28 @@
 .EXAMPLE
     .\build.ps1
 #>
-[CmdletBinding()]
+[CmdletBinding()] #启用高级函数特性,使脚本支持参数和错误处理
 param(
-    [string]$InstallFolderName = 'windows_use_linux_order'
+    [string]$InstallFolderName = 'windows_use_linux_order' # 安装目录名称
 )
 
-$ErrorActionPreference = 'Stop'
+$ErrorActionPreference = 'Stop' # 设置错误处理方式为停止脚本执行
 
-$markerBegin = '# >>> windows_use_linux_order BEGIN'
-$markerEnd   = '# <<< windows_use_linux_order END'
+# 使用标记保护加载块，精准替换旧代码
+$markerBegin = '# >>> windows_use_linux_order BEGIN' # 加载块开始标记
+$markerEnd   = '# <<< windows_use_linux_order END' # 加载块结束标记
 
-$repoRoot = $PSScriptRoot
-$srcRoot  = Join-Path $repoRoot 'src'
-$loadScript = Join-Path $srcRoot 'load.ps1'
+$repoRoot = $PSScriptRoot # 仓库根目录,获得脚本所在目录
+$srcRoot  = Join-Path $repoRoot 'src' # 源码目录,获取src目录
+$loadScript = Join-Path $srcRoot 'load.ps1' # 加载脚本,获取load.ps1文件
 
+# 检查源码是否存在
 if (-not (Test-Path -LiteralPath $loadScript)) {
-    throw "未找到源码: $loadScript"
+    throw "未找到源码: $loadScript" # 抛出异常,停止脚本执行
 }
+# 检查$PROFILE是否定义
 if (-not $PROFILE) {
-    throw '$PROFILE 未定义，无法安装。'
+    throw '$PROFILE 未定义，无法安装。' # 抛出异常,停止脚本执行
 }
 
 $profileDir = Split-Path -Parent $PROFILE
@@ -43,25 +46,25 @@ Write-Host "配置文件: $PROFILE"
 Write-Host ''
 
 # --- 1. 复制 src 到安装目录 ---
-if (Test-Path -LiteralPath $installRoot) {
-    Remove-Item -LiteralPath $installRoot -Recurse -Force
+if (Test-Path -LiteralPath $installRoot) { # 检查安装目录是否存在
+    Remove-Item -LiteralPath $installRoot -Recurse -Force # 删除安装目录
 }
-New-Item -ItemType Directory -Path $installRoot -Force | Out-Null
-Copy-Item -Path (Join-Path $srcRoot '*') -Destination $installRoot -Recurse -Force
+New-Item -ItemType Directory -Path $installRoot -Force | Out-Null # 创建安装目录
+Copy-Item -Path (Join-Path $srcRoot '*') -Destination $installRoot -Recurse -Force # 复制源码到安装目录
 Write-Host "已复制文件到: $installRoot"
 
 # --- 2. 从 load.ps1 解析加载顺序 ---
-$relPaths = [System.Collections.Generic.List[string]]::new()
-$inArray = $false
+$relPaths = [System.Collections.Generic.List[string]]::new() # 加载顺序列表
+$inArray = $false # 是否在数组中
 foreach ($line in Get-Content -LiteralPath (Join-Path $installRoot 'load.ps1') -Encoding UTF8) {
-    if ($line -match '\$script:WuloLoadOrder\s*=\s*@\(') {
-        $inArray = $true
+    if ($line -match '\$script:WuloLoadOrder\s*=\s*@\(') { # 如果匹配到这个字符串,作为数组开始
+        $inArray = $true # 设置为true,表示在数组中
         continue
     }
-    if ($inArray) {
-        if ($line -match '^\s*\)\s*$') { break }
+    if ($inArray) { # 如果inArray为true,表示在数组中
+        if ($line -match '^\s*\)\s*$') { break } # 如果匹配到这个字符串,作为数组结束
         if ($line -match "^\s*'([^']+)'\s*$") {
-            $relPaths.Add($Matches[1])
+            $relPaths.Add($Matches[1]) # 添加到加载顺序列表
         }
     }
 }

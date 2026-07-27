@@ -1,8 +1,9 @@
 ﻿# 按依赖顺序加载全部模块（开发态 / 安装态共用）
 # 用法: . .\load.ps1
 
-$script:WuloRoot = $PSScriptRoot
+$script:WuloRoot = $PSScriptRoot # 项目根目录
 
+# 加载顺序
 $script:WuloLoadOrder = @(
     # 公共辅助
     'common\Write-RGB.ps1'
@@ -11,6 +12,7 @@ $script:WuloLoadOrder = @(
     'common\Format-FileSize.ps1'
     'common\Merge-UnixFlagLetters.ps1'
     # 提示符
+    'prompt\Format-PromptPath.ps1'
     'prompt\prompt.ps1'
     # 命令
     'ls\ls.ps1'
@@ -25,6 +27,7 @@ $script:WuloLoadOrder = @(
     'mv\mv.ps1'
 )
 
+# 按顺序加载模块
 foreach ($rel in $script:WuloLoadOrder) {
     $full = Join-Path $script:WuloRoot $rel
     if (-not (Test-Path -LiteralPath $full)) {
