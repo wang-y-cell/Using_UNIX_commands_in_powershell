@@ -65,7 +65,7 @@ function prompt {
     Write-RGB -Text "$path" -R 97 -G 175 -B 239 -NoNewline
     
     # 分隔符 (白色)
-    Write-Host " $" -ForegroundColor White -NoNewline
+    Write-Host "$" -ForegroundColor White -NoNewline
     
     return " "
 }
