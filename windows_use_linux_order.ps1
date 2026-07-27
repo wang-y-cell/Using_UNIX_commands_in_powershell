@@ -218,7 +218,7 @@ function ls-horizontal {
             $sizeText = $sizeTexts[$i].PadLeft($sizeWidth)
             $i++
 
-            Write-Host "$modeText  " -ForegroundColor Blue -NoNewline
+            Write-RGB -Text "$modeText  " -R 97 -G 175 -B 239 -NoNewline
             Write-Host "$timeText  " -ForegroundColor Gray -NoNewline
             Write-Host "$sizeText  " -ForegroundColor DarkGray -NoNewline
             Write-RGB -Text $item.Name -R $rgb[0] -G $rgb[1] -B $rgb[2]
