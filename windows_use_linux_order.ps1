@@ -20,6 +20,30 @@ function Write-RGB {
     }
 }
 
+# =========================================
+# 辅助函数： 切分文件路径
+# =========================================
+function get_path_array {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+    return $Path -split "\"
+}
+
+function get_zip_path {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$PathArray
+    )
+    if ($PathArray.Count -le 4) {
+        return $PathArray -join "\"
+    }
+    return $PathArray[0] + "\...\" + $PathArray[-2] + "\" + $PathArray[-1]
+}
+
+
+
 # ==========================================
 # 2. 辅助函数：计算视觉宽度 (解决中文对齐)
 # ==========================================
@@ -62,7 +86,9 @@ function prompt {
     Write-Host "windows@PS:" -ForegroundColor Green -NoNewline
     
     # 路径 (深蓝)
-    Write-RGB -Text "$path" -R 97 -G 175 -B 239 -NoNewline
+    $PathArray = get_path_array -Path $path # 获得字符数组
+    $PathArray = get_zip_path -PathArray $PathArray # 获得压缩文件路径
+    Write-RGB -Text "$PathArray" -R 97 -G 175 -B 239 -NoNewline # 输出压缩文件路径
     
     # 分隔符 (白色)
     Write-Host "$" -ForegroundColor White -NoNewline
@@ -112,11 +138,13 @@ function Format-FileSize {
     return $text
 }
 
+
+
 # ==========================================
 # 6. 核心功能：智能 ls (横向 / 长列表，支持组合参数)
 # ==========================================
 # PowerShell 会把 -al / -lh 解析为参数名，故需显式声明各组合开关
-function ls-horizontal {
+function Get-Horizontal {
     param(
         [switch]$a,
         [switch]$l,
@@ -268,7 +296,7 @@ function ls-horizontal {
 # 7. 别名设置与 ll 命令增强
 # ==========================================
 Remove-Item alias:ls -ErrorAction SilentlyContinue
-Set-Alias -Name ls -Value ls-horizontal -Option AllScope -Force
+Set-Alias -Name ls -Value Get-Horizontal -Option AllScope -Force
 
 function ll {
     # 固定等价于 ls -alh（显示隐藏 + 长列表 + 可读大小）
@@ -277,9 +305,9 @@ function ll {
         [object[]]$RemainingArguments
     )
     if ($RemainingArguments -and $RemainingArguments.Count -gt 0) {
-        ls-horizontal -alh @RemainingArguments
+        Get-Horizontal -alh @RemainingArguments
     } else {
-        ls-horizontal -alh
+        Get-Horizontal -alh
     }
 }
 
