@@ -18,7 +18,7 @@ function prompt {
     }
 
     # 提示符尾部
-    Write-RGB -Text ' $' -R $WHITE[0] -G $WHITE[1] -B $WHITE[2] -NoNewline
+    Write-RGB -Text '$' -R $WHITE[0] -G $WHITE[1] -B $WHITE[2] -NoNewline
 
     return ' '
 }
