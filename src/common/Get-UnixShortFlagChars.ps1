@@ -3,13 +3,13 @@
 function Get-UnixShortFlagChars {
     param(
         [Parameter(Mandatory = $false)]
-        [object[]]$Arguments
+        [object[]]$Arguments # 参数数组
     )
 
-    $chars = [System.Collections.Generic.List[string]]::new()
+    $chars = [System.Collections.Generic.List[string]]::new() # 创建一个动态数组
 
     foreach ($arg in @($Arguments)) {
-        if ($null -eq $arg) { continue }
+        if ($null -eq $arg) { continue } # 如果参数列表为空则返回
         $text = [string]$arg
         if ([string]::IsNullOrWhiteSpace($text)) { continue }
 
@@ -36,9 +36,9 @@ function Get-UnixPathArgs {
     foreach ($arg in @($Arguments)) {
         if ($null -eq $arg) { continue }
         $text = [string]$arg
-        if ([string]::IsNullOrWhiteSpace($text)) { continue }
-        if ($text -match '^-([a-zA-Z]+)$') { continue }
-        $paths.Add($text)
+        if ([string]::IsNullOrWhiteSpace($text)) { continue } # 如果文本为空则返回
+        if ($text -match '^-([a-zA-Z]+)$') { continue } # 如果文本匹配短选项则返回
+        $paths.Add($text) # 将非参数放入列表
     }
 
     return [string[]]$paths.ToArray()

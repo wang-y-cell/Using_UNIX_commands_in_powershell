@@ -1,15 +1,16 @@
 ﻿# 智能 ls（横向 / 长列表，支持组合参数）
 # 使用简单函数（无 param），未声明的 -al/-lh 等会进入 $args，再交给短选项解析
 function ls-horizontal {
-    $flags = @(Get-UnixShortFlagChars -Arguments $args)
-    $pathArgs = @(Get-UnixPathArgs -Arguments $args)
+    $flags = @(Get-UnixShortFlagChars -Arguments $args) # 获得短选项
+    $pathArgs = @(Get-UnixPathArgs -Arguments $args) # 获得路径参数
 
-    $showAll = $flags -contains 'a'
-    $longFormat = $flags -contains 'l'
-    $humanReadable = $flags -contains 'h'
+    $showAll = $flags -contains 'a' # 显示所有文件
+    $longFormat = $flags -contains 'l' # 长列表模式
+    $humanReadable = $flags -contains 'h' # 人类可读模式
 
     # -h 仅在长列表中有意义；单独 -h 时按 -lh 处理
-    if ($humanReadable -and -not $longFormat) {
+    if ($humanReadable -and -not $longFormat) { 
+        # 如果人类可读模式为true，且长列表模式为false，则设置长列表模式为true
         $longFormat = $true
     }
 
