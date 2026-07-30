@@ -17,8 +17,8 @@ function ls-horizontal {
         [switch]$lha,
         [switch]$hal,
         [switch]$hla,
-        [Parameter(ValueFromRemainingArguments = $true)]
-        [object[]]$RemainingArguments
+        [Parameter(ValueFromRemainingArguments = $true)] #接收剩余参数
+        [object[]]$RemainingArguments #剩余参数，是一个对象数组
     )
 
     # 合并独立开关与组合开关：支持 ls -l -a / ls -al / ls -lh 等
