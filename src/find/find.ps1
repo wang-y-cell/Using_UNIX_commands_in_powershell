@@ -1,4 +1,5 @@
 ﻿# Linux 风格 find（-name/-iname/-type/-mtime/-size ...）
+# 简单函数：从 $args 解析路径与带值选项（-mtime -1 等值不能当短选项拆）
 function find {
     <#
     .SYNOPSIS
@@ -9,41 +10,106 @@ function find {
         find . -type d -mtime -1
         find . -type f -size +100M
     #>
-    param(
-        [Parameter(Position = 0)]
-        [string]$Path = '.',
 
-        [string]$name,
-        [string]$iname,
+    $argv = @($args)
+    $path = '.'
+    $name = $null
+    $iname = $null
+    $type = $null
+    $mtime = $null
+    $mmin = $null
+    $atime = $null
+    $ctime = $null
+    $size = $null
+    $hasMtime = $false
+    $hasMmin = $false
+    $hasAtime = $false
+    $hasCtime = $false
+    $hasSize = $false
 
-        [ValidateSet('f', 'd', 'l', 'F', 'D', 'L')]
-        [string]$type,
+    $i = 0
+    while ($i -lt $argv.Count) {
+        $tok = [string]$argv[$i]
+        if ($tok -eq '-name') {
+            if ($i + 1 -ge $argv.Count) { Write-Error 'find: missing argument to `-name`'; return }
+            $name = [string]$argv[$i + 1]
+            $i += 2
+            continue
+        }
+        if ($tok -eq '-iname') {
+            if ($i + 1 -ge $argv.Count) { Write-Error 'find: missing argument to `-iname`'; return }
+            $iname = [string]$argv[$i + 1]
+            $i += 2
+            continue
+        }
+        if ($tok -eq '-type') {
+            if ($i + 1 -ge $argv.Count) { Write-Error 'find: missing argument to `-type`'; return }
+            $type = [string]$argv[$i + 1]
+            $i += 2
+            continue
+        }
+        if ($tok -eq '-mtime') {
+            if ($i + 1 -ge $argv.Count) { Write-Error 'find: missing argument to `-mtime`'; return }
+            $mtime = [string]$argv[$i + 1]
+            $hasMtime = $true
+            $i += 2
+            continue
+        }
+        if ($tok -eq '-mmin') {
+            if ($i + 1 -ge $argv.Count) { Write-Error 'find: missing argument to `-mmin`'; return }
+            $mmin = [string]$argv[$i + 1]
+            $hasMmin = $true
+            $i += 2
+            continue
+        }
+        if ($tok -eq '-atime') {
+            if ($i + 1 -ge $argv.Count) { Write-Error 'find: missing argument to `-atime`'; return }
+            $atime = [string]$argv[$i + 1]
+            $hasAtime = $true
+            $i += 2
+            continue
+        }
+        if ($tok -eq '-ctime') {
+            if ($i + 1 -ge $argv.Count) { Write-Error 'find: missing argument to `-ctime`'; return }
+            $ctime = [string]$argv[$i + 1]
+            $hasCtime = $true
+            $i += 2
+            continue
+        }
+        if ($tok -eq '-size') {
+            if ($i + 1 -ge $argv.Count) { Write-Error 'find: missing argument to `-size`'; return }
+            $size = [string]$argv[$i + 1]
+            $hasSize = $true
+            $i += 2
+            continue
+        }
+        if ($tok.StartsWith('-')) {
+            Write-Error "find: unknown predicate `$tok'"
+            return
+        }
+        $path = $tok
+        $i++
+    }
 
-        # 修改时间：天 / 分钟
-        [string]$mtime,
-        [string]$mmin,
-        # 访问时间：天（Windows: LastAccessTime）
-        [string]$atime,
-        # 状态变更：天（Windows 近似为 CreationTime）
-        [string]$ctime,
+    if ($type -and $type -notin @('f', 'd', 'l', 'F', 'D', 'L')) {
+        Write-Error "find: invalid argument `$type' to `-type'"
+        return
+    }
 
-        [string]$size
-    )
-
-    if (-not (Test-Path -LiteralPath $Path)) {
-        Write-Error "路径不存在: $Path"
+    if (-not (Test-Path -LiteralPath $path)) {
+        Write-Error "路径不存在: $path"
         return
     }
 
     $sizeFilter = $null
-    if ($PSBoundParameters.ContainsKey('size')) {
+    if ($hasSize) {
         $sizeFilter = Convert-FindSizeSpec -Spec ([string]$size)
     }
 
-    $mtimeFilter = if ($PSBoundParameters.ContainsKey('mtime')) { Convert-FindTimeSpec -Spec ([string]$mtime) } else { $null }
-    $mminFilter  = if ($PSBoundParameters.ContainsKey('mmin'))  { Convert-FindTimeSpec -Spec ([string]$mmin) }  else { $null }
-    $atimeFilter = if ($PSBoundParameters.ContainsKey('atime')) { Convert-FindTimeSpec -Spec ([string]$atime) } else { $null }
-    $ctimeFilter = if ($PSBoundParameters.ContainsKey('ctime')) { Convert-FindTimeSpec -Spec ([string]$ctime) } else { $null }
+    $mtimeFilter = if ($hasMtime) { Convert-FindTimeSpec -Spec ([string]$mtime) } else { $null }
+    $mminFilter  = if ($hasMmin)  { Convert-FindTimeSpec -Spec ([string]$mmin) }  else { $null }
+    $atimeFilter = if ($hasAtime) { Convert-FindTimeSpec -Spec ([string]$atime) } else { $null }
+    $ctimeFilter = if ($hasCtime) { Convert-FindTimeSpec -Spec ([string]$ctime) } else { $null }
 
     $namePattern = $null
     if ($name) {
@@ -60,9 +126,9 @@ function find {
     $typeKey = if ($type) { $type.ToLowerInvariant() } else { $null }
     $now = Get-Date
 
-    $root = Get-Item -LiteralPath $Path -Force
+    $root = Get-Item -LiteralPath $path -Force
     $items = @($root) + @(
-        Get-ChildItem -LiteralPath $Path -Recurse -Force -ErrorAction SilentlyContinue
+        Get-ChildItem -LiteralPath $path -Recurse -Force -ErrorAction SilentlyContinue
     )
 
     foreach ($item in $items) {

@@ -1,60 +1,12 @@
 ﻿# 智能 ls（横向 / 长列表，支持组合参数）
-# PowerShell 会把 -al / -lh 解析为参数名，故需显式声明各组合开关
+# 使用简单函数（无 param），未声明的 -al/-lh 等会进入 $args，再交给短选项解析
 function ls-horizontal {
-    param(
-        [switch]$a,
-        [switch]$l,
-        [switch]$h,
-        [switch]$al,
-        [switch]$la,
-        [switch]$lh,
-        [switch]$hl,
-        [switch]$ah,
-        [switch]$ha,
-        [switch]$alh,
-        [switch]$ahl,
-        [switch]$lah,
-        [switch]$lha,
-        [switch]$hal,
-        [switch]$hla,
-        [Parameter(ValueFromRemainingArguments = $true)] #接收剩余参数
-        [object[]]$RemainingArguments #剩余参数，是一个对象数组
-    )
+    $flags = @(Get-UnixShortFlagChars -Arguments $args)
+    $pathArgs = @(Get-UnixPathArgs -Arguments $args)
 
-    # 合并独立开关与组合开关：支持 ls -l -a / ls -al / ls -lh 等
-    $flagText = ''
-    if ($a)   { $flagText += 'a' }
-    if ($l)   { $flagText += 'l' }
-    if ($h)   { $flagText += 'h' }
-    if ($al)  { $flagText += 'al' }
-    if ($la)  { $flagText += 'la' }
-    if ($lh)  { $flagText += 'lh' }
-    if ($hl)  { $flagText += 'hl' }
-    if ($ah)  { $flagText += 'ah' }
-    if ($ha)  { $flagText += 'ha' }
-    if ($alh) { $flagText += 'alh' }
-    if ($ahl) { $flagText += 'ahl' }
-    if ($lah) { $flagText += 'lah' }
-    if ($lha) { $flagText += 'lha' }
-    if ($hal) { $flagText += 'hal' }
-    if ($hla) { $flagText += 'hla' }
-
-    # 也接受位置参数形式：ls '-al'、ls --% -al
-    $pathArgs = [System.Collections.Generic.List[object]]::new()
-    foreach ($arg in @($RemainingArguments)) {
-        if ($null -eq $arg) { continue }
-        $argText = [string]$arg
-        if ([string]::IsNullOrWhiteSpace($argText)) { continue }
-        if ($argText -match '^-[alh]+$') {
-            $flagText += $argText.TrimStart('-')
-            continue
-        }
-        $pathArgs.Add($arg)
-    }
-
-    $showAll = $flagText.Contains('a')
-    $longFormat = $flagText.Contains('l')
-    $humanReadable = $flagText.Contains('h')
+    $showAll = $flags -contains 'a'
+    $longFormat = $flags -contains 'l'
+    $humanReadable = $flags -contains 'h'
 
     # -h 仅在长列表中有意义；单独 -h 时按 -lh 处理
     if ($humanReadable -and -not $longFormat) {
@@ -67,9 +19,8 @@ function ls-horizontal {
     if ($showAll) {
         $gciParams.Force = $true
     }
-    # 无路径时不要传 Path（@RemainingArguments 为空时可能带入 $null）
     if ($pathArgs.Count -gt 0) {
-        $gciParams.Path = $pathArgs.ToArray()
+        $gciParams.Path = [string[]]$pathArgs
     }
 
     $items = Get-ChildItem @gciParams

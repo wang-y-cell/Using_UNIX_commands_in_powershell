@@ -1,24 +1,16 @@
 ﻿# touch（-c 不创建，仅更新已存在文件的时间戳）
 function touch {
-    param(
-        [Alias('no-create')]
-        [switch]$c,
-        [Parameter(ValueFromRemainingArguments = $true)]
-        [object[]]$RemainingArguments
-    )
+    $flags = @(Get-UnixShortFlagChars -Arguments $args | ForEach-Object { $_.ToLowerInvariant() })
+    $paths = @(Get-UnixPathArgs -Arguments $args)
 
-    $parsed = Merge-UnixFlagLetters -Seed '' -ExtraSwitches @(
-        $(if ($c) { 'c' } else { '' })
-    ) -RemainingArguments $RemainingArguments -AllowedPattern '[c]'
-
-    $noCreate = $parsed.Flags.Contains('c')
-    if ($parsed.Paths.Count -eq 0) {
+    $noCreate = $flags -contains 'c'
+    if ($paths.Count -eq 0) {
         Write-Error 'touch: missing file operand'
         return
     }
 
     $now = Get-Date
-    foreach ($path in $parsed.Paths) {
+    foreach ($path in $paths) {
         if (Test-Path -LiteralPath $path) {
             try {
                 $item = Get-Item -LiteralPath $path -Force

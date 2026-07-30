@@ -10,6 +10,7 @@ $script:WuloLoadOrder = @(
     'common\Get-VisualWidth.ps1'
     'common\Get-ItemColor.ps1'
     'common\Format-FileSize.ps1'
+    'common\Get-UnixShortFlagChars.ps1'
     'common\Merge-UnixFlagLetters.ps1'
     # 提示符
     'prompt\Format-PromptPath.ps1'

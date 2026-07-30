@@ -1,12 +1,5 @@
-﻿# ll：固定等价于 ls -alh
+﻿# ll：固定等价于 ls -alh（简单函数，直接把 -alh 与路径传入 $args）
 function ll {
-    param(
-        [Parameter(ValueFromRemainingArguments = $true)]
-        [object[]]$RemainingArguments
-    )
-    if ($RemainingArguments -and $RemainingArguments.Count -gt 0) {
-        ls-horizontal -alh @RemainingArguments
-    } else {
-        ls-horizontal -alh
-    }
+    $all = @('-alh') + @($args)
+    ls-horizontal @all
 }

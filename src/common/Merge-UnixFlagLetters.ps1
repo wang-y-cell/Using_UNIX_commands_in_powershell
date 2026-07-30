@@ -1,4 +1,4 @@
-﻿# 合并 Linux 风格短选项（独立开关 + -rf 等组合 + 位置参数中的 -xxx）
+﻿# 合并 Linux 风格短选项（基于 Get-UnixShortFlagChars / Get-UnixPathArgs）
 function Merge-UnixFlagLetters {
     param(
         [string]$Seed = '',
@@ -7,25 +7,25 @@ function Merge-UnixFlagLetters {
         [string]$AllowedPattern = '[a-zA-Z]'
     )
 
-    $flagText = $Seed
+    $argList = [System.Collections.Generic.List[object]]::new()
+    if ($Seed) { $argList.Add("-$Seed") }
     foreach ($sw in @($ExtraSwitches)) {
-        if ($sw) { $flagText += $sw }
+        if ($sw) { $argList.Add("-$sw") }
+    }
+    foreach ($arg in @($RemainingArguments)) {
+        if ($null -ne $arg) { $argList.Add($arg) }
     }
 
-    $pathArgs = [System.Collections.Generic.List[string]]::new()
-    foreach ($arg in @($RemainingArguments)) {
-        if ($null -eq $arg) { continue }
-        $text = [string]$arg
-        if ([string]::IsNullOrWhiteSpace($text)) { continue }
-        if ($text -match "^-$AllowedPattern+$") {
-            $flagText += $text.TrimStart('-')
-            continue
+    $allChars = @(Get-UnixShortFlagChars -Arguments $argList.ToArray())
+    $allowedChars = [System.Collections.Generic.List[string]]::new()
+    foreach ($ch in $allChars) {
+        if ($ch -match "^$AllowedPattern$") {
+            $allowedChars.Add($ch)
         }
-        $pathArgs.Add($text)
     }
 
     return [pscustomobject]@{
-        Flags = $flagText
-        Paths = $pathArgs.ToArray()
+        Flags = ($allowedChars -join '')
+        Paths = @(Get-UnixPathArgs -Arguments $argList.ToArray())
     }
 }

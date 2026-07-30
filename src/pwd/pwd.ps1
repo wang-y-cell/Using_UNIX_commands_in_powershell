@@ -1,8 +1,8 @@
 ﻿Remove-Item alias:pwd -ErrorAction SilentlyContinue
 function pwd {
-    param([switch]$P)
+    $flags = @(Get-UnixShortFlagChars -Arguments $args | ForEach-Object { $_.ToLowerInvariant() })
     $path = (Get-Location).Path
-    if ($P) {
+    if ($flags -contains 'p') {
         try { return (Get-Item -LiteralPath $path).FullName }
         catch { return $path }
     }

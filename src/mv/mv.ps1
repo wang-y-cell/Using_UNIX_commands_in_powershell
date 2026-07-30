@@ -1,32 +1,19 @@
 ﻿# mv（-f 覆盖, -v 详细）
 Remove-Item alias:mv -ErrorAction SilentlyContinue
 function mv {
-    param(
-        [switch]$f,
-        [switch]$v,
-        [Alias('vf')]
-        [switch]$fv,
-        [Parameter(ValueFromRemainingArguments = $true)]
-        [object[]]$RemainingArguments
-    )
+    $flags = @(Get-UnixShortFlagChars -Arguments $args | ForEach-Object { $_.ToLowerInvariant() })
+    $paths = @(Get-UnixPathArgs -Arguments $args)
 
-    $seed = ''
-    if ($f) { $seed += 'f' }
-    if ($v) { $seed += 'v' }
-    if ($fv) { $seed += 'fv' }
+    $force = $flags -contains 'f'
+    $verbose = $flags -contains 'v'
 
-    $parsed = Merge-UnixFlagLetters -Seed $seed -RemainingArguments $RemainingArguments -AllowedPattern '[fFvV]'
-    $flagsLower = $parsed.Flags.ToLowerInvariant()
-    $force = $flagsLower.Contains('f')
-    $verbose = $flagsLower.Contains('v')
-
-    if ($parsed.Paths.Count -lt 2) {
+    if ($paths.Count -lt 2) {
         Write-Error 'mv: missing file operand'
         return
     }
 
-    $dest = $parsed.Paths[-1]
-    $sources = $parsed.Paths[0..($parsed.Paths.Length - 2)]
+    $dest = $paths[-1]
+    $sources = $paths[0..($paths.Length - 2)]
 
     if ($sources.Count -gt 1) {
         if (-not (Test-Path -LiteralPath $dest) -or -not (Get-Item -LiteralPath $dest).PSIsContainer) {

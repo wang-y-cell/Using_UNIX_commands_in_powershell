@@ -2,24 +2,16 @@
 Remove-Item alias:mkdir -ErrorAction SilentlyContinue
 Remove-Item function:mkdir -ErrorAction SilentlyContinue
 function mkdir {
-    param(
-        [Alias('parents')]
-        [switch]$p,
-        [Parameter(ValueFromRemainingArguments = $true)]
-        [object[]]$RemainingArguments
-    )
+    $flags = @(Get-UnixShortFlagChars -Arguments $args | ForEach-Object { $_.ToLowerInvariant() })
+    $paths = @(Get-UnixPathArgs -Arguments $args)
 
-    $parsed = Merge-UnixFlagLetters -Seed '' -ExtraSwitches @(
-        $(if ($p) { 'p' } else { '' })
-    ) -RemainingArguments $RemainingArguments -AllowedPattern '[p]'
-
-    $makeParents = $parsed.Flags.Contains('p')
-    if ($parsed.Paths.Count -eq 0) {
+    $makeParents = $flags -contains 'p'
+    if ($paths.Count -eq 0) {
         Write-Error 'mkdir: missing operand'
         return
     }
 
-    foreach ($dir in $parsed.Paths) {
+    foreach ($dir in $paths) {
         if (Test-Path -LiteralPath $dir) {
             if (-not $makeParents) {
                 Write-Error "mkdir: cannot create directory '${dir}': File exists"
