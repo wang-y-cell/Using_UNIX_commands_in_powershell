@@ -2,7 +2,7 @@
 # 简单函数：从 $args 解析；支持管道输入路径、管道输出完整路径
 # 例：find . -name "*.txt" | grep foo
 #     '.\src', '.\docs' | find -type f -name "*.ps1"
-Remove-Item alias:find -ErrorAction SilentlyContinue
+Remove-Item -Force alias:find -ErrorAction SilentlyContinue
 function find {
     <#
     .SYNOPSIS

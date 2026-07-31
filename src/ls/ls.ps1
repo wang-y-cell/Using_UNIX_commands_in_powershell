@@ -270,7 +270,7 @@ function Format-LsColumnMajor {
     }
 }
 
-Remove-Item alias:ls -ErrorAction SilentlyContinue #删除ls别名
+Remove-Item -Force alias:ls -ErrorAction SilentlyContinue #删除ls别名
 # -Option AllScope 表示在所有作用域中都有效
 # -Force 表示如果别名已存在，则覆盖它
 Set-Alias -Name ls -Value ls-horizontal -Option AllScope -Force #设置ls别名

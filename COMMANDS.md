@@ -15,6 +15,21 @@
 | `find` | 按名称、类型、时间、大小递归查找（支持管道） |
 | `grep` | 按正则匹配文本行（支持文件与管道） |
 | `cat` | 输出文件内容（支持管道、行号） |
+| `head` | 输出文件或管道的前 N 行（默认 10） |
+| `tail` | 输出文件或管道的末 N 行（默认 10；支持 `-n +N`） |
+| `wc` | 统计行数 / 词数 / 字节数 |
+| `tee` | 将管道内容同时写到文件与成功流 |
+| `sort` | 对行排序（支持 `-r`/`-n`/`-u`） |
+| `uniq` | 去除相邻重复行（支持 `-c`/`-i`/`-d`） |
+| `basename` | 取出路径中的文件名（可去后缀） |
+| `dirname` | 取出路径中的目录部分 |
+| `tree` | 以树形显示目录结构 |
+| `du` | 统计目录/文件占用空间 |
+| `df` | 显示文件系统磁盘空间 |
+| `ln` | 创建符号链接 / 硬链接 |
+| `diff` | 比较两个文本文件差异 |
+| `which` | 定位命令（可执行文件 / 函数 / 别名） |
+| `clear` | 清屏 |
 | `pwd` | 打印当前工作目录 |
 | `mkdir` | 创建目录（支持 `-p`） |
 | `touch` | 创建空文件或更新时间戳（支持 `-c`） |
@@ -214,6 +229,188 @@ cat README.md | grep powershell
 
 ---
 
+## head
+
+输出每个文件（或管道）的前 N 行，默认 10 行。多个文件时打印 `==> 文件名 <==` 分隔头。
+
+### 选项
+
+| 选项 | 说明 |
+|------|------|
+| `-n N` / `-nN` / `-N` | 输出前 N 行 |
+
+### 示例
+
+```powershell
+head a.txt
+head -n 5 a.txt
+head -3 README.md
+head a.txt b.txt
+Get-Content a.txt | head -n 5
+cat README.md | head -n 3
+```
+
+---
+
+## tail
+
+输出每个文件（或管道）的末 N 行，默认 10 行。多个文件时打印 `==> 文件名 <==` 分隔头。
+
+### 选项
+
+| 选项 | 说明 |
+|------|------|
+| `-n N` / `-nN` / `-N` | 输出末 N 行 |
+| `-n +N` / `-n+N` | 从第 N 行起输出到末尾 |
+
+### 示例
+
+```powershell
+tail a.txt
+tail -n 5 a.txt
+tail -n +3 a.txt
+Get-Content a.txt | tail -n 5
+cat README.md | tail -n 2
+```
+
+不支持 `-f`（跟随写入）。
+
+---
+
+## wc
+
+统计行数、词数、字节数。未指定选项时三项都输出；多个文件时最后多一行 `total`。
+
+### 选项
+
+| 选项 | 说明 |
+|------|------|
+| `-l` | 只统计行数 |
+| `-w` | 只统计词数 |
+| `-c` | 只统计字节数（文件用实际大小；管道按 UTF-8 估算） |
+| 组合 | `-lw`、`-lc` 等 |
+
+### 示例
+
+```powershell
+wc a.txt
+wc -l a.txt b.txt
+Get-Content a.txt | wc -l
+cat README.md | wc -w
+```
+
+---
+
+## tee
+
+从管道读取内容，写入一个或多个文件的同时，原样输出到成功流。
+
+### 选项
+
+| 选项 | 说明 |
+|------|------|
+| `-a` | 追加写入（默认覆盖） |
+
+### 示例
+
+```powershell
+Get-Content a.txt | tee out.txt
+ls | tee -a log.txt
+cat README.md | tee a.txt b.txt | head -n 3
+```
+
+必须通过管道提供输入；会覆盖 PowerShell 自带的 `tee`（`Tee-Object`）别名。
+
+---
+
+## sort
+
+对输入行排序后输出。可从文件或管道读取；多个文件的行会合并后再排序。
+
+### 选项
+
+| 选项 | 说明 |
+|------|------|
+| `-r` | 逆序 |
+| `-n` | 按行首数字排序 |
+| `-u` | 去重（排序后相邻相同行只保留一行） |
+| 组合 | `-ru`、`-nu` 等 |
+
+### 示例
+
+```powershell
+sort a.txt
+sort -r a.txt
+Get-Content a.txt | sort -n
+ls | sort -u
+```
+
+会覆盖 PowerShell 自带的 `sort`（`Sort-Object`）别名。
+
+---
+
+## uniq
+
+去除**相邻**重复行（通常先 `sort` 再 `uniq`）。可从文件或管道读取。
+
+### 选项
+
+| 选项 | 说明 |
+|------|------|
+| `-c` | 在每行前显示重复次数 |
+| `-i` | 忽略大小写比较 |
+| `-d` | 只输出有重复的行 |
+| 组合 | `-ci`、`-cd` 等 |
+
+### 示例
+
+```powershell
+sort a.txt | uniq
+uniq -c a.txt
+Get-Content a.txt | sort | uniq -i
+'a','a','b','b','b' | uniq -c
+```
+
+---
+
+## basename
+
+取出路径的最后一段（文件名）。传统用法可附带要去掉的后缀；`-a` / `-s` 用于多个路径。
+
+### 语法
+
+```text
+basename NAME [SUFFIX]
+basename -a NAME...
+basename -s SUFFIX NAME...
+```
+
+### 示例
+
+```powershell
+basename C:\foo\bar.txt
+basename C:\foo\bar.txt .txt
+basename -a a.txt b.txt
+basename -s .ps1 .\src\cat\cat.ps1
+```
+
+---
+
+## dirname
+
+取出路径的目录部分；无目录时输出 `.`。
+
+### 示例
+
+```powershell
+dirname C:\foo\bar.txt
+dirname .\src\cat\cat.ps1
+dirname bar.txt
+dirname a.txt b.txt
+```
+
+---
+
 ## pwd
 
 打印当前工作目录。
@@ -357,6 +554,157 @@ mv f1.txt f2.txt .\outdir\
 ```
 
 多个源时，最后一个参数必须是已存在的目录。
+
+---
+
+## tree
+
+以树形结构显示目录。默认隐藏以 `.` 开头的项；彩色规则与 `ls` 相同。
+
+### 选项
+
+| 选项 | 说明 |
+|------|------|
+| `-a` | 显示隐藏项 |
+| `-d` | 只显示目录 |
+| `-L N` / `-LN` | 限制递归深度为 N |
+
+### 示例
+
+```powershell
+tree
+tree .\src
+tree -L 2 .\src
+tree -d .\src
+tree -a -L 1 .
+```
+
+---
+
+## du
+
+估算文件或目录占用的磁盘空间。
+
+### 选项
+
+| 选项 | 说明 |
+|------|------|
+| `-h` | 人类可读大小（K/M/G…） |
+| `-s` | 只输出总计 |
+| `-a` | 同时列出文件（默认主要列目录） |
+| 组合 | `-sh`、`-ah` 等 |
+
+### 示例
+
+```powershell
+du -sh .
+du -h .\src
+du -a .\src\common
+du -sh .\src .\docs
+```
+
+---
+
+## df
+
+显示文件系统的磁盘空间使用情况（基于 `Get-PSDrive`）。
+
+### 选项
+
+| 选项 | 说明 |
+|------|------|
+| `-h` | 人类可读大小 |
+
+### 示例
+
+```powershell
+df
+df -h
+df -h C:\
+```
+
+未指定路径时列出所有文件系统驱动器；指定路径时只显示该路径所在盘符。
+
+---
+
+## ln
+
+创建链接。`-s` 为符号链接，否则为硬链接（仅文件）。
+
+### 选项
+
+| 选项 | 说明 |
+|------|------|
+| `-s` | 创建符号链接 |
+| `-f` | 若链接名已存在则先删除再创建 |
+| 组合 | `-sf`、`-fs` |
+
+### 示例
+
+```powershell
+ln -s .\README.md .\readme-link
+ln -sf .\src\load.ps1 .\load-link
+ln .\README.md .\readme-hard   # 硬链接（同卷文件）
+```
+
+Windows 上创建符号链接通常需要**管理员权限**或开启**开发者模式**。
+
+---
+
+## diff
+
+逐行比较两个文本文件，输出类似传统 Unix `diff` 的差异块。
+
+### 选项
+
+| 选项 | 说明 |
+|------|------|
+| `-q` | 仅报告是否不同，不打印具体差异 |
+| `-i` | 忽略大小写 |
+| 组合 | `-qi` |
+
+### 示例
+
+```powershell
+diff a.txt b.txt
+diff -q a.txt b.txt
+diff -i old.txt new.txt
+```
+
+不支持目录比较。文件相同则无输出。会覆盖 PowerShell 自带的 `diff`（`Compare-Object`）别名。
+
+---
+
+## which
+
+在 PATH、函数与别名中定位命令。
+
+### 选项
+
+| 选项 | 说明 |
+|------|------|
+| `-a` | 列出全部匹配（不只第一个） |
+
+### 示例
+
+```powershell
+which git
+which -a ls
+which pwd grep
+which sort
+```
+
+---
+
+## clear
+
+清屏（调用 `Clear-Host`）。
+
+### 示例
+
+```powershell
+clear
+```
 
 ---
 

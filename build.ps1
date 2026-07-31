@@ -1,10 +1,10 @@
-﻿<#
+<#
 .SYNOPSIS
-    将 src 安装到 $PROFILE 父目录下的 windows_use_linux_order，并写入 $PROFILE 加载路径。
+    将 src 安装到 $PROFILE 父目录下的 Using_UNIX_commands_in_powershell，并写入 $PROFILE 加载路径。
 
 .DESCRIPTION
     1. 若 $PROFILE 文件不存在则自动创建（终端醒目提示），并确保其父目录存在
-    2. 复制仓库 src\ 全部文件到：$(Split-Path $PROFILE -Parent)\windows_use_linux_order\
+    2. 复制仓库 src\ 全部文件到：$(Split-Path $PROFILE -Parent)\Using_UNIX_commands_in_powershell\
     3. 在 $PROFILE 中写入（或更新）受标记保护的加载块，逐文件点源加载各函数。
 
 .EXAMPLE
@@ -12,14 +12,17 @@
 #>
 [CmdletBinding()] #启用高级函数特性,使脚本支持参数和错误处理
 param(
-    [string]$InstallFolderName = 'windows_use_linux_order' # 安装目录名称
+    [string]$InstallFolderName = 'Using_UNIX_commands_in_powershell' # 安装目录名称
 )
 
 $ErrorActionPreference = 'Stop' # 设置错误处理方式为停止脚本执行
 
 # 使用标记保护加载块，精准替换旧代码
-$markerBegin = '# >>> windows_use_linux_order BEGIN' # 加载块开始标记
-$markerEnd   = '# <<< windows_use_linux_order END' # 加载块结束标记
+$markerBegin = '# >>> Using_UNIX_commands_in_powershell BEGIN' # 加载块开始标记
+$markerEnd   = '# <<< Using_UNIX_commands_in_powershell END' # 加载块结束标记
+$legacyMarkerBegin = '# >>> windows_use_linux_order BEGIN'
+$legacyMarkerEnd   = '# <<< windows_use_linux_order END'
+$legacyFolderName  = 'windows_use_linux_order'
 
 $repoRoot = $PSScriptRoot # 仓库根目录,获得脚本所在目录
 $srcRoot  = Join-Path $repoRoot 'src' # 源码目录,获取src目录
@@ -73,11 +76,18 @@ New-Item -ItemType Directory -Path $installRoot -Force | Out-Null # 创建安装
 Copy-Item -Path (Join-Path $srcRoot '*') -Destination $installRoot -Recurse -Force # 复制源码到安装目录
 Write-Host "已复制文件到: $installRoot"
 
+# 清理旧版安装目录
+$legacyInstall = Join-Path $profileDir $legacyFolderName
+if ($legacyInstall -ne $installRoot -and (Test-Path -LiteralPath $legacyInstall)) {
+    Remove-Item -LiteralPath $legacyInstall -Recurse -Force
+    Write-Host "已删除旧安装目录: $legacyInstall"
+}
+
 # --- 2. 从 load.ps1 解析加载顺序 ---
 $relPaths = [System.Collections.Generic.List[string]]::new() # 加载顺序列表
 $inArray = $false # 是否在数组中
 foreach ($line in Get-Content -LiteralPath (Join-Path $installRoot 'load.ps1') -Encoding UTF8) {
-    if ($line -match '\$script:WuloLoadOrder\s*=\s*@\(') { # 如果匹配到这个字符串,作为数组开始
+    if ($line -match '\$script:UucipLoadOrder\s*=\s*@\(') { # 如果匹配到这个字符串,作为数组开始
         $inArray = $true # 设置为true,表示在数组中
         continue
     }
@@ -103,12 +113,12 @@ foreach ($rel in $relPaths) {
 $block = [System.Collections.Generic.List[string]]::new()
 $block.Add($markerBegin)
 $block.Add('# 由 build.ps1 自动生成；重新运行 build.ps1 可更新本段')
-$block.Add("`$__wuloRoot = Join-Path (Split-Path `$PROFILE -Parent) '$InstallFolderName'")
+$block.Add("`$__uucipRoot = Join-Path (Split-Path `$PROFILE -Parent) '$InstallFolderName'")
 foreach ($rel in $relPaths) {
     $escaped = $rel.Replace("'", "''")
-    $block.Add(". (Join-Path `$__wuloRoot '$escaped')")
+    $block.Add(". (Join-Path `$__uucipRoot '$escaped')")
 }
-$block.Add('Remove-Variable __wuloRoot -ErrorAction SilentlyContinue')
+$block.Add('Remove-Variable __uucipRoot -ErrorAction SilentlyContinue')
 $block.Add($markerEnd)
 
 # --- 4. 写入 / 更新 $PROFILE ---
@@ -116,14 +126,14 @@ $out = [System.Collections.Generic.List[string]]::new()
 $skip = $false
 $replaced = $false
 foreach ($line in @(Get-Content -LiteralPath $PROFILE -ErrorAction SilentlyContinue)) {
-    if ($line -eq $markerBegin) {
+    if ($line -eq $markerBegin -or $line -eq $legacyMarkerBegin) {
         $skip = $true
         foreach ($bl in $block) { $out.Add($bl) }
         $replaced = $true
         continue
     }
     if ($skip) {
-        if ($line -eq $markerEnd) { $skip = $false }
+        if ($line -eq $markerEnd -or $line -eq $legacyMarkerEnd) { $skip = $false }
         continue
     }
     $out.Add($line)

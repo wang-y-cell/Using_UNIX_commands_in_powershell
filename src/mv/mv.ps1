@@ -1,5 +1,5 @@
 ﻿# mv（-f 覆盖, -v 详细）
-Remove-Item alias:mv -ErrorAction SilentlyContinue
+Remove-Item -Force alias:mv -ErrorAction SilentlyContinue
 function mv {
     $flags = @(Get-UnixShortFlagChars -Arguments $args | ForEach-Object { $_.ToLowerInvariant() })
     $paths = @(Get-UnixPathArgs -Arguments $args)

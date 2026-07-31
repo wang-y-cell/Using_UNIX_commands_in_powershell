@@ -1,9 +1,9 @@
-# cat（简单函数 + $args）
-# 支持：cat FILE...、管道输入；短选项 -n（全部行号）/-b（非空行行号）
-# 例：cat a.txt
+﻿# cat锛堢畝鍗曞嚱鏁?+ $args锛?
+# 鏀寔锛歝at FILE...銆佺閬撹緭鍏ワ紱鐭€夐」 -n锛堝叏閮ㄨ鍙凤級/-b锛堥潪绌鸿琛屽彿锛?
+# 渚嬶細cat a.txt
 #     cat -n a.txt b.txt
 #     Get-Content a.txt | cat -n
-Remove-Item alias:cat -ErrorAction SilentlyContinue
+Remove-Item -Force alias:cat -ErrorAction SilentlyContinue
 function cat {
     begin {
         $flags = @(Get-UnixShortFlagChars -Arguments $args | ForEach-Object { $_.ToLowerInvariant() })
@@ -11,11 +11,11 @@ function cat {
 
         $numberAll = $flags -contains 'n'
         $numberNonBlank = $flags -contains 'b'
-        # -b 优先于 -n（与 GNU cat 一致）
+        # -b 浼樺厛浜?-n锛堜笌 GNU cat 涓€鑷达級
         if ($numberNonBlank) { $numberAll = $false }
 
         $fromPipeline = $MyInvocation.ExpectingInput
-        # 用哈希表保存计数，便于 scriptblock 跨作用域递增
+        # 鐢ㄥ搱甯岃〃淇濆瓨璁℃暟锛屼究浜?scriptblock 璺ㄤ綔鐢ㄥ煙閫掑
         $state = @{
             LineNo     = 0
             NonBlankNo = 0

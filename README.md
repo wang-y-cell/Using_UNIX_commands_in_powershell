@@ -3,11 +3,14 @@
 在 Windows PowerShell 中使用接近 Linux / Ubuntu 习惯的常用命令与终端体验。
 ![参考](image/image.png)
 
-本项目通过模块化脚本（入口 `src/load.ps1` / `windows_use_linux_order.ps1`）提供：
+本项目通过模块化脚本（入口 `src/load.ps1` / `Using_UNIX_commands_in_powershell.ps1`）提供：
 
 - Linux 风格的 `ls` / `ll`（彩色、横向多列、长列表、可读大小；管道时输出文件名）
 - Linux 风格的 `find`（支持管道输入路径、管道输出完整路径）
-- 文本工具：`grep`、`cat`（支持管道）
+- 文本工具：`grep`、`cat`、`head`、`tail`、`wc`、`tee`、`sort`、`uniq`、`diff`
+- 路径工具：`basename`、`dirname`、`tree`
+- 磁盘与链接：`du`、`df`、`ln`
+- 其他：`which`、`clear`
 - 常用文件命令：`pwd`、`mkdir`、`touch`、`rm`、`cp`、`mv`
 - 类似 `user@host:path $` 的彩色提示符
 - `build.ps1` 安装 / `remove.ps1` 卸载
@@ -28,7 +31,7 @@
 
 ```powershell
 git clone <你的仓库地址>
-cd windows_use_linux_order
+cd Using_UNIX_commands_in_powershell
 ```
 
 ### 2. 永久安装（推荐：运行 build.ps1）
@@ -41,14 +44,15 @@ cd windows_use_linux_order
 
 `build.ps1` 会自动完成：
 
-1. 将 `src\` 复制到 `$PROFILE` 同级目录下的 `windows_use_linux_order\`
+1. 将 `src\` 复制到 `$PROFILE` 同级目录下的 `Using_UNIX_commands_in_powershell\`
 2. 在 `$PROFILE` 中写入（或更新）受标记保护的加载块
 3. 若本机尚无 `$PROFILE` 文件，会**自动创建**，并在终端用醒目颜色提示
+4. 若仍存在旧版 `windows_use_linux_order` 标记块/安装目录，会一并清理
 
 安装完成后，**重新打开**一个 PowerShell 窗口即可生效。当前会话也可立即加载：
 
 ```powershell
-. "$([IO.Path]::Combine((Split-Path $PROFILE -Parent), 'windows_use_linux_order', 'load.ps1'))"
+. "$([IO.Path]::Combine((Split-Path $PROFILE -Parent), 'Using_UNIX_commands_in_powershell', 'load.ps1'))"
 ```
 
 再次运行 `.\build.ps1` 可覆盖安装目录并刷新 `$PROFILE` 中的加载块。
@@ -64,7 +68,7 @@ cd windows_use_linux_order
 或使用兼容入口：
 
 ```powershell
-. .\windows_use_linux_order.ps1
+. .\Using_UNIX_commands_in_powershell.ps1
 ```
 
 注意前面的点号 `.`（点源加载），这样函数和别名才会进入当前会话。
@@ -79,6 +83,16 @@ find . -name "*.ps1"
 ls | grep Color
 cat -n .\README.md
 find . -type f -name "*.ps1" | grep grep
+head -n 5 .\README.md
+cat .\README.md | tail -n 3
+wc -l .\README.md
+Get-Content .\README.md | sort | uniq | head -n 5
+basename .\src\cat\cat.ps1
+dirname .\src\cat\cat.ps1
+tree -L 1 .\src
+du -sh .\src
+df -h
+which ls
 ```
 
 关闭该窗口后配置会失效。
@@ -117,13 +131,13 @@ notepad $PROFILE
 在配置文件末尾添加一行（路径改成你的实际路径）：
 
 ```powershell
-. "F:\wy\windows_use_linux_order\src\load.ps1"
+. "F:\wy\Using_UNIX_commands_in_powershell\src\load.ps1"
 ```
 
 或：
 
 ```powershell
-. "F:\wy\windows_use_linux_order\windows_use_linux_order.ps1"
+. "F:\wy\Using_UNIX_commands_in_powershell\Using_UNIX_commands_in_powershell.ps1"
 ```
 
 保存后，**重新打开**一个 PowerShell 窗口即可自动生效。
@@ -131,7 +145,7 @@ notepad $PROFILE
 也可一行追加：
 
 ```powershell
-Add-Content -Path $PROFILE -Value '. "F:\wy\windows_use_linux_order\src\load.ps1"'
+Add-Content -Path $PROFILE -Value '. "F:\wy\Using_UNIX_commands_in_powershell\src\load.ps1"'
 ```
 
 ### 5. 若提示“无法加载，因为在此系统上禁止运行脚本”
@@ -147,30 +161,35 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 也可不改策略，仅对当前会话绕过：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -NoExit -File "F:\wy\windows_use_linux_order\windows_use_linux_order.ps1"
+powershell -ExecutionPolicy Bypass -NoExit -File "F:\wy\Using_UNIX_commands_in_powershell\Using_UNIX_commands_in_powershell.ps1"
 ```
 
 注意：`-File` 会在脚本结束后退出（除非加 `-NoExit`）；若希望函数留在交互会话里，仍建议用点源加载：
 
 ```powershell
-powershell -NoExit -Command ". 'F:\wy\windows_use_linux_order\src\load.ps1'"
+powershell -NoExit -Command ". 'F:\wy\Using_UNIX_commands_in_powershell\src\load.ps1'"
 ```
 
 ## 验证是否生效
 
 ```powershell
-Get-Command ls, ll, find, grep, cat, mkdir, touch, rm, cp, mv, pwd
+Get-Command ls, ll, find, grep, cat, head, tail, wc, tee, sort, uniq, basename, dirname, tree, du, df, ln, diff, which, clear, mkdir, touch, rm, cp, mv, pwd
 ls -alh
 ll
 find . -type f -name "*.ps1"
 ls .\src\common | grep Color
 cat -n .\README.md | Select-Object -First 5
+head -n 3 .\README.md
+wc -l .\README.md
+tree -L 1 .\src
+du -sh .
+df -h
 ```
 
 提示符应类似：
 
 ```text
-windows@PS:F:\wy\windows_use_linux_order $
+windows@PS:F:\wy\Using_UNIX_commands_in_powershell $
 ```
 
 （提示符中的用户名目前写死在脚本的 `prompt` 函数里，可按需自行修改。）
@@ -187,7 +206,8 @@ windows@PS:F:\wy\windows_use_linux_order $
 - `find` 的 `-ctime` 在 Windows 上用创建时间近似（系统无 Unix 语义上的 ctime）。
 - `ls` 颜色规则为简化版（目录 / 可执行脚本 / 压缩包 / 图片 / 其他）。
 - `ls` 直接显示时为彩色多列；接入管道时输出文件名，便于 `ls | grep`。
-- 部分命令会覆盖 PowerShell 自带别名（如 `ls`、`cat`、`mkdir`、`pwd`、`rm`、`cp`、`mv`）。若不需要，可卸载本项目。
+- `ln -s` 在 Windows 上创建符号链接通常需要管理员权限或开启开发者模式。
+- 部分命令会覆盖 PowerShell 自带别名（如 `ls`、`cat`、`mkdir`、`pwd`、`rm`、`cp`、`mv`、`sort`、`tee`、`clear`、`diff`）。若不需要，可卸载本项目。
 
 ## 卸载
 
@@ -199,8 +219,8 @@ windows@PS:F:\wy\windows_use_linux_order $
 
 `remove.ps1` 会：
 
-1. 从 `$PROFILE` 删除 `# >>> windows_use_linux_order BEGIN` … `# <<< windows_use_linux_order END` 整段
-2. 删除 `$PROFILE` 同级目录下的 `windows_use_linux_order\` 安装文件夹
+1. 从 `$PROFILE` 删除 `# >>> Using_UNIX_commands_in_powershell BEGIN` … `# <<< Using_UNIX_commands_in_powershell END` 整段（旧版 `windows_use_linux_order` 标记也会清理）
+2. 删除 `$PROFILE` 同级目录下的 `Using_UNIX_commands_in_powershell\` 安装文件夹（旧版目录一并删除）
 
 仅清理配置、保留安装目录时：
 

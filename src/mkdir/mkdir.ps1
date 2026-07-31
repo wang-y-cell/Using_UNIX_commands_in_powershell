@@ -1,5 +1,5 @@
 ﻿# mkdir（-p 创建父目录；目录已存在时不报错）
-Remove-Item alias:mkdir -ErrorAction SilentlyContinue
+Remove-Item -Force alias:mkdir -ErrorAction SilentlyContinue
 Remove-Item function:mkdir -ErrorAction SilentlyContinue
 function mkdir {
     $flags = @(Get-UnixShortFlagChars -Arguments $args | ForEach-Object { $_.ToLowerInvariant() })
