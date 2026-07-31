@@ -20,6 +20,8 @@ $script:WuloLoadOrder = @(
     'ls\ll.ps1'
     'find\helpers.ps1'
     'find\find.ps1'
+    'grep\grep.ps1'
+    'cat\cat.ps1'
     'pwd\pwd.ps1'
     'mkdir\mkdir.ps1'
     'touch\touch.ps1'

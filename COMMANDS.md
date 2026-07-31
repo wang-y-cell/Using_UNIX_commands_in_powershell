@@ -1,6 +1,6 @@
 # 命令参考
 
-本文档说明 `windows_use_linux_order.ps1` 加载后可用的命令、参数与示例。
+本文档说明加载本项目后可用的命令、参数与示例。
 
 配置与安装方式见 [README.md](README.md)。
 
@@ -10,9 +10,11 @@
 
 | 命令 | 作用 |
 |------|------|
-| `ls` | 列出目录内容（横向多列 / 长列表，彩色） |
+| `ls` | 列出目录内容（横向多列 / 长列表，彩色；管道时输出文件名） |
 | `ll` | 等价于 `ls -alh` |
-| `find` | 按名称、类型、时间、大小递归查找 |
+| `find` | 按名称、类型、时间、大小递归查找（支持管道） |
+| `grep` | 按正则匹配文本行（支持文件与管道） |
+| `cat` | 输出文件内容（支持管道、行号） |
 | `pwd` | 打印当前工作目录 |
 | `mkdir` | 创建目录（支持 `-p`） |
 | `touch` | 创建空文件或更新时间戳（支持 `-c`） |
@@ -20,15 +22,19 @@
 | `cp` | 复制文件/目录（支持 `-r` / `-f` / `-v`） |
 | `mv` | 移动/重命名（支持 `-f` / `-v`） |
 
-另有自定义 `prompt`：显示 `wangy@windowsPS:<路径> $` 风格提示符。
+另有自定义 `prompt`：显示 `windows@PS:<路径> $` 风格提示符。
 
-多数命令支持 Linux 常见的**组合短选项**，例如 `-al`、`-rf`、`-lh`。也可写成分开的开关：`-l -a`。
+多数命令支持 Linux 常见的**组合短选项**，例如 `-al`、`-rf`、`-lh`、`-in`。也可写成分开的开关：`-l -a`。
+
+命令多为**简单函数**，通过 `$args` 解析短选项，因此可直接写 `ls -al`、`rm -rf`、`grep -in`。
 
 ---
 
 ## ls
 
-列出目录内容。默认横向多列；带 `-l` 时为长列表。
+列出目录内容。默认横向多列（Linux 风格：先下后右、按列定宽）；带 `-l` 时为长列表。
+
+接入管道时改为向成功流输出**文件名**（无彩色排版），便于 `ls | grep`。
 
 ### 选项
 
@@ -50,13 +56,15 @@ ls -lh
 ls -al
 ls -alh
 ls -l -a .\docs
+ls .\src\common | grep Color
 ```
 
 ### 显示说明
 
 - **目录**：蓝色
 - **`.exe` / `.bat` / `.ps1`**：绿色
-- **压缩包**（`.zip` / `.7z` / `.rar` / `.tar` / `.gz`）：品红
+- **压缩包**（`.zip` / `.7z` / `.rar` / `.tar` / `.gz`）：红色系
+- **图片**（`.jpg` / `.png` / `.gif`）：紫色
 - **其他文件**：近白色
 - 长列表列顺序为：Windows Mode（如 `d-----` / `-a----`）、修改时间、大小、名称；目录及无大小项显示为 `-`；大小列按当前列表最长内容自动对齐
 
@@ -78,16 +86,18 @@ ll C:\Users
 
 ## find
 
-Linux 风格文件查找（常用子集）。默认从当前目录 `.` 递归搜索，输出匹配项的完整路径。
+Linux 风格文件查找（常用子集）。默认从当前目录 `.` 递归搜索，向成功流输出匹配项的完整路径（可管道）。
+
+也支持从管道接收搜索根路径。
 
 ### 语法
 
 ```text
-find [路径] [-name 模式] [-iname 模式] [-type f|d|l]
+find [路径...] [-name 模式] [-iname 模式] [-type f|d|l]
      [-mtime N] [-mmin N] [-atime N] [-ctime N] [-size 规格]
 ```
 
-路径可省略，默认为 `.`。
+路径可省略，默认为 `.`；也可通过管道传入一个或多个路径。
 
 ### 选项
 
@@ -134,7 +144,73 @@ find . -type f -mtime -1
 find . -type f -mmin -30
 find . -type f -size +100M
 find C:\temp -name "log*" -type f -size -10k
+find . -type f -name "*.ps1" | grep Color
+'.\src\common' | find -name "Write*"
+'.\src', '.\docs' | find -type f -name "*.md"
 ```
+
+---
+
+## grep
+
+按正则表达式匹配文本行。可从文件读取，也可从管道接收输入。
+
+### 语法
+
+```text
+grep [选项] PATTERN [FILE...]
+... | grep [选项] PATTERN
+```
+
+### 选项
+
+| 选项 | 说明 |
+|------|------|
+| `-i` | 忽略大小写 |
+| `-v` | 反向匹配（输出不匹配的行） |
+| `-n` | 显示行号 |
+| 组合 | `-in`、`-iv` 等 |
+
+管道对象若为文件系统对象，按**名称**匹配；字符串则按内容匹配。
+
+### 示例
+
+```powershell
+grep error app.log
+grep -i error app.log
+grep -n TODO app.log notes.txt
+ls .\src\common | grep Color
+find . -name "*.ps1" | grep grep
+Get-Content app.log | grep -v debug
+'one','two','txtfile' | grep txt
+```
+
+无文件且无管道输入时会报错。
+
+---
+
+## cat
+
+输出文件内容到成功流（可继续管道）。也支持从管道接收行并原样（或带行号）输出。
+
+### 选项
+
+| 选项 | 说明 |
+|------|------|
+| `-n` | 对全部行编号 |
+| `-b` | 仅对非空行编号（优先于 `-n`） |
+
+### 示例
+
+```powershell
+cat a.txt
+cat -n a.txt b.txt
+cat -b a.txt
+Get-Content a.txt | cat -n
+cat README.md | grep powershell
+```
+
+未提供文件且无管道时会报错。不支持用单独的 `-` 表示标准输入（请改用管道）。
 
 ---
 
@@ -167,8 +243,6 @@ pwd -P
 |------|------|
 | `-p` | 创建中间缺失的父目录；目标已存在时不报错 |
 
-也支持 `-parents`（`-p` 的别名）。
-
 ### 示例
 
 ```powershell
@@ -193,8 +267,6 @@ mkdir dir1 dir2
 | 选项 | 说明 |
 |------|------|
 | `-c` | 不创建新文件；仅当文件已存在时更新时间戳 |
-
-也支持 `-no-create`（`-c` 的别名）。
 
 ### 示例
 
@@ -293,22 +365,32 @@ mv f1.txt f2.txt .\outdir\
 加载脚本后，提示符格式为：
 
 ```text
-wangy@windowsPS:<当前路径> $
+windows@PS:<当前路径> $
 ```
 
-其中用户名 `wangy` 与主机标签 `windowsPS` 写在脚本的 `prompt` 函数中，可按需修改。
+其中标签 `windows@PS` 写在脚本的 `prompt` 函数中，可按需修改。路径分段使用项目颜色常量显示。
 
 ---
 
-## PowerShell 参数写法提示
+## PowerShell 参数与管道提示
 
-PowerShell 会把以 `-` 开头的内容解析为参数名。本脚本已为常见组合开关做了声明，因此下列写法通常都可用：
+多数命令使用简单函数 + `$args` 解析短选项，因此下列写法通常都可用：
 
 ```powershell
 ls -al
 ls -a -l
 rm -rf folder
+grep -in error app.log
 find . -name "*.log" -type f
+```
+
+常见管道示例：
+
+```powershell
+ls | grep Color
+find . -type f -name "*.ps1" | grep grep
+cat README.md | grep powershell
+'.\src' | find -name "*.ps1"
 ```
 
 若某环境仍把短选项吃掉，可尝试：

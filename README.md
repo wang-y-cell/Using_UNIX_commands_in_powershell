@@ -1,16 +1,18 @@
-# powershell_use_linux_order
+# Using_UNIX_commands_in_powershell
 
 在 Windows PowerShell 中使用接近 Linux / Ubuntu 习惯的常用命令与终端体验。
 ![参考](image/image.png)
 
-本项目通过一个 PowerShell 脚本（`windows_use_linux_order.ps1`），提供：
+本项目通过模块化脚本（入口 `src/load.ps1` / `windows_use_linux_order.ps1`）提供：
 
-- Linux 风格的 `ls` / `ll`（彩色、横向多列、长列表、可读大小）
-- Linux 风格的 `find`
+- Linux 风格的 `ls` / `ll`（彩色、横向多列、长列表、可读大小；管道时输出文件名）
+- Linux 风格的 `find`（支持管道输入路径、管道输出完整路径）
+- 文本工具：`grep`、`cat`（支持管道）
 - 常用文件命令：`pwd`、`mkdir`、`touch`、`rm`、`cp`、`mv`
 - 类似 `user@host:path $` 的彩色提示符
+- `build.ps1` 安装 / `remove.ps1` 卸载
 
-命令参数与行为尽量贴近 GNU/Linux 常见用法（支持 `-al`、`-rf` 等组合开关）。完整命令说明见 [COMMANDS.md](COMMANDS.md)。
+命令参数与行为尽量贴近 GNU/Linux 常见用法（支持 `-al`、`-rf` 等组合短选项）。完整命令说明见 [COMMANDS.md](COMMANDS.md)。
 
 ## 环境要求
 
@@ -74,6 +76,9 @@ ls
 ll
 pwd
 find . -name "*.ps1"
+ls | grep Color
+cat -n .\README.md
+find . -type f -name "*.ps1" | grep grep
 ```
 
 关闭该窗口后配置会失效。
@@ -154,10 +159,12 @@ powershell -NoExit -Command ". 'F:\wy\windows_use_linux_order\src\load.ps1'"
 ## 验证是否生效
 
 ```powershell
-Get-Command ls, ll, find, mkdir, touch, rm, cp, mv, pwd
+Get-Command ls, ll, find, grep, cat, mkdir, touch, rm, cp, mv, pwd
 ls -alh
 ll
 find . -type f -name "*.ps1"
+ls .\src\common | grep Color
+cat -n .\README.md | Select-Object -First 5
 ```
 
 提示符应类似：
@@ -178,14 +185,30 @@ windows@PS:F:\wy\windows_use_linux_order $
 
 - 本项目是对常用 Linux 命令的**子集模拟**，并非完整 GNU coreutils / findutils。
 - `find` 的 `-ctime` 在 Windows 上用创建时间近似（系统无 Unix 语义上的 ctime）。
-- `ls` 颜色规则为简化版（目录 / 可执行脚本 / 压缩包 / 其他）。
-- 部分命令会覆盖 PowerShell 自带别名（如 `ls`、`mkdir`、`pwd`、`rm`、`cp`、`mv`）。若不需要，可从 `$PROFILE` 中移除对本脚本的引用。
+- `ls` 颜色规则为简化版（目录 / 可执行脚本 / 压缩包 / 图片 / 其他）。
+- `ls` 直接显示时为彩色多列；接入管道时输出文件名，便于 `ls | grep`。
+- 部分命令会覆盖 PowerShell 自带别名（如 `ls`、`cat`、`mkdir`、`pwd`、`rm`、`cp`、`mv`）。若不需要，可卸载本项目。
 
 ## 卸载
 
-若曾用 `build.ps1` 安装：从 `$PROFILE` 中删除 `# >>> windows_use_linux_order BEGIN` 到 `# <<< windows_use_linux_order END` 整段，并可删除 `$PROFILE` 同级目录下的 `windows_use_linux_order\` 文件夹。
+推荐在仓库根目录执行：
 
-若是手动写入的一行加载语句：删掉该行即可。
+```powershell
+.\remove.ps1
+```
+
+`remove.ps1` 会：
+
+1. 从 `$PROFILE` 删除 `# >>> windows_use_linux_order BEGIN` … `# <<< windows_use_linux_order END` 整段
+2. 删除 `$PROFILE` 同级目录下的 `windows_use_linux_order\` 安装文件夹
+
+仅清理配置、保留安装目录时：
+
+```powershell
+.\remove.ps1 -KeepInstallFolder
+```
+
+也可手动：从 `$PROFILE` 删除上述标记块，并删除安装目录；若是手动写入的一行加载语句，删掉该行即可。
 
 保存后重新打开 PowerShell 生效。
 

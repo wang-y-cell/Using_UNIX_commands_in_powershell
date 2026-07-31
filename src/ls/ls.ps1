@@ -33,6 +33,15 @@ function ls-horizontal {
 
     if (-not $items) { return }
 
+    # 管道输出：向成功流写入名称，供 grep 等下游使用（如 ls | grep txt）
+    $pipingOut = $MyInvocation.PipelinePosition -lt $MyInvocation.PipelineLength
+    if ($pipingOut) {
+        foreach ($item in @($items)) {
+            $item.Name
+        }
+        return
+    }
+
     # --- 长列表模式：ls -l / -lh / -al / -alh ---
     if ($longFormat) {
         # 先格式化全部大小，按最长文本定列宽，避免固定宽度留白过多
