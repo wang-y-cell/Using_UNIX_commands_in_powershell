@@ -5,7 +5,8 @@ $script:WuloRoot = $PSScriptRoot # 项目根目录
 
 # 加载顺序
 $script:WuloLoadOrder = @(
-    # 公共辅助
+    # 公共辅助（编码须最先，保证后续脚本中文输出正常）
+    'common\Set-ConsoleUtf8.ps1'
     'common\Write-RGB.ps1'
     'common\Get-VisualWidth.ps1'
     'common\Get-ItemColor.ps1'
