@@ -3,6 +3,7 @@
 # 例：du -sh .
 #     du -h .\src
 #     du -a .\src\common
+# 每扫完一项立即输出一行（固定宽度右对齐），避免长时间无反馈
 function du {
     $flags = @(Get-UnixShortFlagChars -Arguments $args | ForEach-Object { $_.ToLowerInvariant() })
     $paths = @(Get-UnixPathArgs -Arguments $args)
@@ -11,6 +12,9 @@ function du {
     $summarize = $flags -contains 's'
     $all = $flags -contains 'a'
     if ($paths.Count -eq 0) { $paths = @('.') }
+
+    # 人类可读较短，字节数最长约 15 位；固定宽度便于边扫边打仍对齐
+    $sizeWidth = if ($human) { 8 } else { 12 }
 
     $getSize = {
         param($Item)
@@ -28,7 +32,7 @@ function du {
     $emit = {
         param([int64]$Bytes, [string]$Label)
         $sizeText = Format-FileSize -Bytes $Bytes -HumanReadable:$human
-        Write-Output ("{0}`t{1}" -f $sizeText, $Label)
+        Write-Output ("{0}  {1}" -f $sizeText.PadLeft($sizeWidth), $Label)
     }
 
     foreach ($path in $paths) {
@@ -43,7 +47,6 @@ function du {
             continue
         }
 
-        # 目录：列出子项（及可选文件），最后输出自身
         try {
             $children = @(Get-ChildItem -LiteralPath $root.FullName -Force -ErrorAction Stop)
         } catch {
