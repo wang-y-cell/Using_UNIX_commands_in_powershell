@@ -51,6 +51,12 @@ cd Using_UNIX_commands_in_powershell
 
 再执行`.\build.ps1`
 
+如果还是没有成功并且显示许多中文乱码，是因为我的build.ps1有很多中文字符，默认的powershell使用的不是utf-8编码解读这个文件的导致解析错误了
+解决方法有两个：
+1. **把 build.ps1（以及同类含中文的 .ps1）存成 UTF-8 with BOM(vscode，notepad设置编码方式)**
+2. **(推荐)用 PowerShell 7+（pwsh）跑，默认按 UTF-8 处理脚本**
+使用其中一个运行./build.ps1
+
 `build.ps1` 会自动完成：
 
 1. 将 `src\` 复制到 `$PROFILE` 同级目录下的 `Using_UNIX_commands_in_powershell\`
