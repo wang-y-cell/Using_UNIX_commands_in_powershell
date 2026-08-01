@@ -1,7 +1,5 @@
-﻿# tee锛堢畝鍗曞嚱鏁?+ $args锛?
-# 鏀寔锛?.. | tee [-a] FILE... 锛涘皢绠￠亾鍐呭鍚屾椂鍐欏埌鏂囦欢涓庢垚鍔熸祦
-# 渚嬶細Get-Content a.txt | tee out.txt
-#     ls | tee -a log.txt
+﻿# tee + $args
+# actually .. | tee [-a] FILE...
 Remove-Item -Force alias:tee -ErrorAction SilentlyContinue
 function tee {
     begin {

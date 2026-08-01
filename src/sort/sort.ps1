@@ -1,8 +1,5 @@
-﻿# sort锛堢畝鍗曞嚱鏁?+ $args锛?
-# 鏀寔锛歴ort [-rnu] [FILE...]銆佺閬撹緭鍏?
-# 渚嬶細sort a.txt
-#     Get-Content a.txt | sort -r
-#     ls | sort -u
+﻿# sort + $args
+# actually sort [-rnu] [FILE...]
 Remove-Item -Force alias:sort -ErrorAction SilentlyContinue
 function sort {
     begin {

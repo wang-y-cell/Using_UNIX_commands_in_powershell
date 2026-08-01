@@ -1,8 +1,5 @@
-﻿# diff锛堢畝鍗曞嚱鏁?+ $args锛?
-# 鏀寔锛歞iff [-qi] FILE1 FILE2
-# 渚嬶細diff a.txt b.txt
-#     diff -q a.txt b.txt
-#     diff -i a.txt b.txt
+﻿# diff + $args
+# actually diff [-qi] FILE1 FILE2
 Remove-Item -Force alias:diff -ErrorAction SilentlyContinue
 function diff {
     $flags = @(Get-UnixShortFlagChars -Arguments $args | ForEach-Object { $_.ToLowerInvariant() })

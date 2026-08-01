@@ -1,8 +1,5 @@
-﻿# cat锛堢畝鍗曞嚱鏁?+ $args锛?
-# 鏀寔锛歝at FILE...銆佺閬撹緭鍏ワ紱鐭€夐」 -n锛堝叏閮ㄨ鍙凤級/-b锛堥潪绌鸿琛屽彿锛?
-# 渚嬶細cat a.txt
-#     cat -n a.txt b.txt
-#     Get-Content a.txt | cat -n
+﻿# cat + $args
+# actually cat FILE... -n -b
 Remove-Item -Force alias:cat -ErrorAction SilentlyContinue
 function cat {
     begin {
@@ -27,7 +24,8 @@ function cat {
                 if ($Line -match '\S') {
                     $state.NonBlankNo++
                     Write-Output ("{0,6}`t{1}" -f $state.NonBlankNo, $Line)
-                } else {
+                }
+                else {
                     Write-Output $Line
                 }
                 return
@@ -74,7 +72,8 @@ function cat {
                 foreach ($line in [System.IO.File]::ReadLines($item.FullName)) {
                     & $emit $line
                 }
-            } catch {
+            }
+            catch {
                 Write-Error "cat: ${file}: $($_.Exception.Message)"
             }
         }
