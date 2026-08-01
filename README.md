@@ -37,7 +37,10 @@ cd Using_UNIX_commands_in_powershell
 ### 2. 永久安装（推荐：运行 build.ps1）
 
 一般windows默认不允许直接执行ps1脚本
-现在终端执行`Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned -Force`
+现在终端执行
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned -Force
+```
 
 在仓库根目录执行：
 
@@ -47,7 +50,10 @@ cd Using_UNIX_commands_in_powershell
 
 如果显示没有安装成功，需要手动添加$PROFILE文件
 
-在终端执行`New-Item -ItemType File -Path $PROFILE -Force`
+在终端执行
+```powershell
+New-Item -ItemType File -Path $PROFILE -Force
+```
 
 再执行`.\build.ps1`
 
