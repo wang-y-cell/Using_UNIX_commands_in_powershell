@@ -1,8 +1,9 @@
-﻿# cp（-r/-R 递归, -f 覆盖, -v 详细, 支持 -rf/-rv 等）
+# cp（-r/-R 递归, -f 覆盖, -v 详细, 支持 -rf/-rv 等）
 Remove-Item -Force alias:cp -ErrorAction SilentlyContinue
 function cp {
     $flags = @(Get-UnixShortFlagChars -Arguments $args | ForEach-Object { $_.ToLowerInvariant() })
     $paths = @(Get-UnixPathArgs -Arguments $args)
+    $paths = @(Expand-UnixGlob -Path $paths)
 
     $recursive = $flags -contains 'r'
     $force = $flags -contains 'f'

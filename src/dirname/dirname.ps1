@@ -5,6 +5,7 @@
 #     dirname bar.txt
 function dirname {
     $names = @(Get-UnixPathArgs -Arguments $args)
+    $names = @(Expand-UnixGlob -Path $names)
     if ($names.Count -eq 0) {
         Write-Error 'dirname: missing operand'
         return

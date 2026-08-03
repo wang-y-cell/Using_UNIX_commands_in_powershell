@@ -63,6 +63,12 @@ function tail {
             $i++
         }
 
+        $rawFiles = @($files)
+        $files = [System.Collections.Generic.List[string]]::new()
+        foreach ($f in @(Expand-UnixGlob -Path $rawFiles)) {
+            $files.Add($f)
+        }
+
         $fromPipeline = $MyInvocation.ExpectingInput
         $multiFile = $files.Count -gt 1
         $pipeLineNo = 0

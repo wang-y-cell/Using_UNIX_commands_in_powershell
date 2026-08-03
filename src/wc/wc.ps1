@@ -7,6 +7,7 @@ function wc {
     begin {
         $flags = @(Get-UnixShortFlagChars -Arguments $args | ForEach-Object { $_.ToLowerInvariant() })
         $files = @(Get-UnixPathArgs -Arguments $args)
+        $files = @(Expand-UnixGlob -Path $files)
 
         $showLines = $flags -contains 'l'
         $showWords = $flags -contains 'w'

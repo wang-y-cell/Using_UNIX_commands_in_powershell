@@ -7,6 +7,7 @@ function uniq {
     begin {
         $flags = @(Get-UnixShortFlagChars -Arguments $args | ForEach-Object { $_.ToLowerInvariant() })
         $files = @(Get-UnixPathArgs -Arguments $args)
+        $files = @(Expand-UnixGlob -Path $files)
 
         $showCount = $flags -contains 'c'
         $ignoreCase = $flags -contains 'i'

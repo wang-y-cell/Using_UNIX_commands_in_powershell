@@ -1,10 +1,11 @@
-﻿# cat + $args
+# cat + $args
 # actually cat FILE... -n -b
 Remove-Item -Force alias:cat -ErrorAction SilentlyContinue
 function cat {
     begin {
         $flags = @(Get-UnixShortFlagChars -Arguments $args | ForEach-Object { $_.ToLowerInvariant() })
         $files = @(Get-UnixPathArgs -Arguments $args)
+        $files = @(Expand-UnixGlob -Path $files)
 
         $numberAll = $flags -contains 'n'
         $numberNonBlank = $flags -contains 'b'

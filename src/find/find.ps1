@@ -165,7 +165,16 @@ function find {
         $roots = [System.Collections.Generic.List[string]]::new()
         foreach ($p in $argPaths) { $roots.Add($p) }
         foreach ($p in $pipePaths) { $roots.Add($p) }
-        if ($roots.Count -eq 0) { $roots.Add('.') }
+        if ($roots.Count -eq 0) {
+            $roots.Add('.')
+        }
+        else {
+            $rawRoots = @($roots)
+            $roots = [System.Collections.Generic.List[string]]::new()
+            foreach ($p in @(Expand-UnixGlob -Path $rawRoots)) {
+                $roots.Add($p)
+            }
+        }
 
         foreach ($path in $roots) {
             if (-not (Test-Path -LiteralPath $path)) {

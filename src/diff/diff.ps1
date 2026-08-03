@@ -1,9 +1,10 @@
-﻿# diff + $args
+# diff + $args
 # actually diff [-qi] FILE1 FILE2
 Remove-Item -Force alias:diff -ErrorAction SilentlyContinue
 function diff {
     $flags = @(Get-UnixShortFlagChars -Arguments $args | ForEach-Object { $_.ToLowerInvariant() })
     $paths = @(Get-UnixPathArgs -Arguments $args)
+    $paths = @(Expand-UnixGlob -Path $paths)
 
     $brief = $flags -contains 'q'
     $ignoreCase = $flags -contains 'i'

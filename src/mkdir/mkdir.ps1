@@ -1,9 +1,10 @@
-﻿# mkdir（-p 创建父目录；目录已存在时不报错）
+# mkdir（-p 创建父目录；目录已存在时不报错）
 Remove-Item -Force alias:mkdir -ErrorAction SilentlyContinue
 Remove-Item function:mkdir -ErrorAction SilentlyContinue
 function mkdir {
     $flags = @(Get-UnixShortFlagChars -Arguments $args | ForEach-Object { $_.ToLowerInvariant() })
     $paths = @(Get-UnixPathArgs -Arguments $args)
+    $paths = @(Expand-UnixGlob -Path $paths)
 
     $makeParents = $flags -contains 'p'
     if ($paths.Count -eq 0) {

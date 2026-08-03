@@ -29,6 +29,7 @@ function grep {
         } else {
             @() # 如果没有文件，则返回空数组
         }
+        $files = @(Expand-UnixGlob -Path $files)
 
         $ignoreCase = $flags -contains 'i' # 忽略大小写
         $invert = $flags -contains 'v' # 反转匹配

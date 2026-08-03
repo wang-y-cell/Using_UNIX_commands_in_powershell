@@ -47,6 +47,12 @@ function head {
             $i++
         }
 
+        $rawFiles = @($files)
+        $files = [System.Collections.Generic.List[string]]::new()
+        foreach ($f in @(Expand-UnixGlob -Path $rawFiles)) {
+            $files.Add($f)
+        }
+
         $fromPipeline = $MyInvocation.ExpectingInput
         $emitted = 0
         $multiFile = $files.Count -gt 1

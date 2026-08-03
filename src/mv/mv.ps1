@@ -1,8 +1,9 @@
-﻿# mv（-f 覆盖, -v 详细）
+# mv（-f 覆盖, -v 详细）
 Remove-Item -Force alias:mv -ErrorAction SilentlyContinue
 function mv {
     $flags = @(Get-UnixShortFlagChars -Arguments $args | ForEach-Object { $_.ToLowerInvariant() })
     $paths = @(Get-UnixPathArgs -Arguments $args)
+    $paths = @(Expand-UnixGlob -Path $paths)
 
     $force = $flags -contains 'f'
     $verbose = $flags -contains 'v'

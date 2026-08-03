@@ -6,6 +6,7 @@
 function ln {
     $flags = @(Get-UnixShortFlagChars -Arguments $args | ForEach-Object { $_.ToLowerInvariant() })
     $paths = @(Get-UnixPathArgs -Arguments $args)
+    $paths = @(Expand-UnixGlob -Path $paths)
 
     $symbolic = $flags -contains 's'
     $force = $flags -contains 'f'

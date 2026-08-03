@@ -1,10 +1,11 @@
-﻿# sort + $args
+# sort + $args
 # actually sort [-rnu] [FILE...]
 Remove-Item -Force alias:sort -ErrorAction SilentlyContinue
 function sort {
     begin {
         $flags = @(Get-UnixShortFlagChars -Arguments $args | ForEach-Object { $_.ToLowerInvariant() })
         $files = @(Get-UnixPathArgs -Arguments $args)
+        $files = @(Expand-UnixGlob -Path $files)
 
         $reverse = $flags -contains 'r'
         $numeric = $flags -contains 'n'

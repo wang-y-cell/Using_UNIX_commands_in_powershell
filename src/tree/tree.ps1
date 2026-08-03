@@ -50,7 +50,16 @@ function tree {
         $i++
     }
 
-    if ($paths.Count -eq 0) { $paths.Add('.') }
+    if ($paths.Count -eq 0) {
+        $paths.Add('.')
+    }
+    else {
+        $rawPaths = @($paths)
+        $paths = [System.Collections.Generic.List[string]]::new()
+        foreach ($p in @(Expand-UnixGlob -Path $rawPaths)) {
+            $paths.Add($p)
+        }
+    }
 
     $useColor = $true
     try {

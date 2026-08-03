@@ -1,7 +1,8 @@
-﻿# touch（-c 不创建，仅更新已存在文件的时间戳）
+# touch（-c 不创建，仅更新已存在文件的时间戳）
 function touch {
     $flags = @(Get-UnixShortFlagChars -Arguments $args | ForEach-Object { $_.ToLowerInvariant() })
     $paths = @(Get-UnixPathArgs -Arguments $args)
+    $paths = @(Expand-UnixGlob -Path $paths)
 
     $noCreate = $flags -contains 'c'
     if ($paths.Count -eq 0) {

@@ -7,6 +7,7 @@
 function du {
     $flags = @(Get-UnixShortFlagChars -Arguments $args | ForEach-Object { $_.ToLowerInvariant() })
     $paths = @(Get-UnixPathArgs -Arguments $args)
+    $paths = @(Expand-UnixGlob -Path $paths)
 
     $human = $flags -contains 'h'
     $summarize = $flags -contains 's'

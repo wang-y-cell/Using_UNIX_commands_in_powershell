@@ -1,8 +1,9 @@
-﻿# rm（-r/-R 递归, -f 强制, 支持 -rf/-fr）
+# rm（-r/-R 递归, -f 强制, 支持 -rf/-fr）
 Remove-Item -Force alias:rm -ErrorAction SilentlyContinue
 function rm {
     $flags = @(Get-UnixShortFlagChars -Arguments $args | ForEach-Object { $_.ToLowerInvariant() })
     $paths = @(Get-UnixPathArgs -Arguments $args)
+    $paths = @(Expand-UnixGlob -Path $paths)
 
     $recursive = $flags -contains 'r'
     $force = $flags -contains 'f'

@@ -86,11 +86,13 @@ function basename {
         }
         $name = $names[0]
         $suf = if ($names.Count -eq 2) { $names[1] } else { $null }
-        Write-Output (Get-BasenameResult -Name $name -Suffix $suf)
+        foreach ($n in @(Expand-UnixGlob -Path $name)) {
+            Write-Output (Get-BasenameResult -Name $n -Suffix $suf)
+        }
         return
     }
 
-    foreach ($name in $names) {
+    foreach ($name in @(Expand-UnixGlob -Path @($names))) {
         Write-Output (Get-BasenameResult -Name $name -Suffix $suffix)
     }
 }

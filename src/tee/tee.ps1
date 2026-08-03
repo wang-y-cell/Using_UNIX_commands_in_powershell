@@ -1,10 +1,11 @@
-﻿# tee + $args
+# tee + $args
 # actually .. | tee [-a] FILE...
 Remove-Item -Force alias:tee -ErrorAction SilentlyContinue
 function tee {
     begin {
         $flags = @(Get-UnixShortFlagChars -Arguments $args | ForEach-Object { $_.ToLowerInvariant() })
         $files = @(Get-UnixPathArgs -Arguments $args)
+        $files = @(Expand-UnixGlob -Path $files)
         $append = $flags -contains 'a'
         $teeAbort = $false
         $writers = [System.Collections.Generic.List[System.IO.StreamWriter]]::new()
