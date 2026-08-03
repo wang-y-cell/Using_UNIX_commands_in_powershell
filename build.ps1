@@ -148,9 +148,13 @@ if (-not $replaced) {
 Set-Content -LiteralPath $PROFILE -Value ($out -join [Environment]::NewLine) -Encoding UTF8
 Write-Host $(if ($replaced) { "updated load block in `$PROFILE" } else { "appended load block to `$PROFILE" })
 
+# 立即加载到当前会话，避免 build 后仍用旧函数（例如 rm * 不展开）
+$installedLoad = Join-Path $installRoot 'load.ps1'
+. $installedLoad
+Write-Host "loaded into current session: $installedLoad"
+
 Write-Host ''
-Write-Host 'installation complete. take effect after reopening PowerShell; or run in current session:'
-Write-Host "  . `"$(Join-Path $installRoot 'load.ps1')`""
+Write-Host 'installation complete. new terminals will load via `$PROFILE`; this session is already updated.'
 Write-Host ''
 Write-Host 'registered function files:'
 foreach ($rel in $relPaths) {

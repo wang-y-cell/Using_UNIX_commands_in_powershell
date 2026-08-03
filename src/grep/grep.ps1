@@ -38,16 +38,29 @@ function grep {
         $multiFile = $files.Count -gt 1 # 是否多文件
         $pipeLineNo = 0 # 管道行号
 
-        try { # 尝试创建正则表达式
+        # 优先按正则；若非法且像通配符（如 *.txt），则按通配匹配整行
+        $matchLine = $null
+        try {
             $regex = [regex]::new(
                 $pattern,
                 $(if ($ignoreCase) { [System.Text.RegularExpressions.RegexOptions]::IgnoreCase }
                   else { [System.Text.RegularExpressions.RegexOptions]::None })
             )
+            $matchLine = { param([string]$Line) $regex.IsMatch($Line) }.GetNewClosure()
         } catch {
-            Write-Error "grep: invalid pattern: $($_.Exception.Message)"
-            $grepAbort = $true
-            return
+            if (Test-UnixGlobPattern -Pattern $pattern) {
+                $wcOpts = [System.Management.Automation.WildcardOptions]::None
+                if ($ignoreCase) {
+                    $wcOpts = [System.Management.Automation.WildcardOptions]::IgnoreCase
+                }
+                $wildcard = [System.Management.Automation.WildcardPattern]::new($pattern, $wcOpts)
+                $matchLine = { param([string]$Line) $wildcard.IsMatch($Line) }.GetNewClosure()
+            }
+            else {
+                Write-Error "grep: invalid pattern: $($_.Exception.Message)"
+                $grepAbort = $true
+                return
+            }
         }
     }
 
@@ -63,7 +76,7 @@ function grep {
             "$_" # 则返回字符串
         }
 
-        $matched = $regex.IsMatch($line)
+        $matched = & $matchLine $line
         if ($invert) { $matched = -not $matched }
         if (-not $matched) { return }
 
@@ -97,7 +110,7 @@ function grep {
             try {
                 foreach ($line in [System.IO.File]::ReadLines($item.FullName)) {
                     $lineNo++
-                    $matched = $regex.IsMatch($line)
+                    $matched = & $matchLine $line
                     if ($invert) { $matched = -not $matched }
                     if (-not $matched) { continue }
 

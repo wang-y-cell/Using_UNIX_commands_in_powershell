@@ -52,8 +52,9 @@
 | `*` / `?` / `[abc]` | 单层目录匹配（如 `*.txt`、`file?.log`） |
 | `**` | 完整路径段，匹配零或多层目录（如 `src/**/*.ps1`） |
 
-- 通配**无匹配**时静默跳过（该参数不产生结果；若全部被跳过，可能触发原有的 `missing operand`）
-- **不展开**：`which` 的命令名、`grep` 的正则、`find -name`/`-iname` 等模式参数
+- 通配**无匹配**时静默跳过（该参数不产生结果；若全部被跳过，可能触发原有的 `missing operand`；`ls *.nomatch` 输出为空，不会改列当前目录）
+- **不展开为路径**：`which` 的命令名、`find -name`/`-iname` 等模式参数
+- `grep` 的 PATTERN：优先作正则；若正则非法且含 `*`/`?`/`[]`，则按通配符匹配整行（如 `ls | grep "*.txt"`）
 - 无通配符的字面路径行为与原先一致（不存在仍由各命令报错）
 
 ---
@@ -183,6 +184,8 @@ find . -type f -name "*.ps1" | grep Color
 
 按正则表达式匹配文本行。可从文件读取，也可从管道接收输入。
 
+若 PATTERN 不是合法正则、但又像通配符（含 `*` / `?` / `[]`），则按通配符对**整行**匹配（便于 `ls | grep "*.txt"`）。
+
 ### 语法
 
 ```text
@@ -208,6 +211,7 @@ grep error app.log
 grep -i error app.log
 grep -n TODO app.log notes.txt
 ls .\src\common | grep Color
+ls | grep "*.txt"
 find . -name "*.ps1" | grep grep
 Get-Content app.log | grep -v debug
 'one','two','txtfile' | grep txt

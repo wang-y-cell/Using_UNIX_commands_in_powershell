@@ -3,7 +3,13 @@
 function ls-horizontal {
     $flags = @(Get-UnixShortFlagChars -Arguments $args) # 获得短选项
     $pathArgs = @(Get-UnixPathArgs -Arguments $args) # 获得路径参数
+    $hadPathArgs = $pathArgs.Count -gt 0
     $pathArgs = @(Expand-UnixGlob -Path $pathArgs)
+
+    # 用户传了路径/通配，但展开后为空 → 不回退到当前目录（避免 ls *.txt 列出全部）
+    if ($hadPathArgs -and $pathArgs.Count -eq 0) {
+        return
+    }
 
     $showAll = $flags -contains 'a' # 显示所有文件
     $longFormat = $flags -contains 'l' # 长列表模式
