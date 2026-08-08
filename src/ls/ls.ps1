@@ -11,6 +11,23 @@ function ls-horizontal {
         return
     }
 
+    # 路径不存在时按 Linux 风格报错，并只继续列出存在的项
+    if ($pathArgs.Count -gt 0) {
+        $existing = [System.Collections.Generic.List[string]]::new()
+        foreach ($p in $pathArgs) {
+            if (Test-Path -LiteralPath $p) {
+                $existing.Add($p)
+            }
+            else {
+                Write-Host "ls: cannot access '${p}': No such file or directory"
+            }
+        }
+        $pathArgs = @($existing)
+        if ($hadPathArgs -and $pathArgs.Count -eq 0) {
+            return
+        }
+    }
+
     $showAll = $flags -contains 'a' # 显示所有文件
     $longFormat = $flags -contains 'l' # 长列表模式
     $humanReadable = $flags -contains 'h' # 人类可读模式
@@ -21,40 +38,94 @@ function ls-horizontal {
         $longFormat = $true
     }
 
+    $pipingOut = $MyInvocation.PipelinePosition -lt $MyInvocation.PipelineLength
+
     $gciParams = @{
         ErrorAction = 'SilentlyContinue'
     }
     if ($showAll) {
         $gciParams.Force = $true
     }
-    if ($pathArgs.Count -gt 0) {
-        $gciParams.Path = [string[]]$pathArgs
+
+    # 无路径参数：列出当前目录（不加目录头）
+    if ($pathArgs.Count -eq 0) {
+        $items = @(Get-ChildItem @gciParams)
+        if (-not $showAll) {
+            $items = @($items | Where-Object { $_.Name -notlike '.*' })
+        }
+        Write-LsItems -Items $items -LongFormat:$longFormat -HumanReadable:$humanReadable -PipingOut:$pipingOut
+        return
     }
 
-    $items = Get-ChildItem @gciParams
-
-    # 过滤以 . 开头的隐藏项（Unix 风格）
-    if (-not $showAll) {
-        $items = $items | Where-Object { $_.Name -notlike '.*' }
+    # 拆分文件 / 目录操作数（多目录时打印「路径:」头，与 Linux ls 一致）
+    $fileItems = [System.Collections.Generic.List[object]]::new()
+    $dirLabels = [System.Collections.Generic.List[string]]::new()
+    foreach ($p in $pathArgs) {
+        $item = Get-Item -LiteralPath $p -Force -ErrorAction SilentlyContinue
+        if (-not $item) { continue }
+        if ($item.PSIsContainer) {
+            $dirLabels.Add($p)
+        }
+        else {
+            $fileItems.Add($item)
+        }
     }
 
-    if (-not $items) { return }
+    # 与 GNU ls 类似：操作数按名称排序后再输出
+    $fileItems = @($fileItems | Sort-Object -Property Name)
+    $dirLabels = @($dirLabels | Sort-Object)
 
-    # 管道输出：向成功流写入名称，供 grep 等下游使用（如 ls | grep txt）
-    $pipingOut = $MyInvocation.PipelinePosition -lt $MyInvocation.PipelineLength
-    if ($pipingOut) {
-        foreach ($item in @($items)) {
+    $showHeaders = ($fileItems.Count + $dirLabels.Count) -gt 1
+    $sectionCount = 0
+
+    if ($fileItems.Count -gt 0) {
+        Write-LsItems -Items $fileItems -LongFormat:$longFormat -HumanReadable:$humanReadable -PipingOut:$pipingOut
+        $sectionCount++
+    }
+
+    foreach ($dir in $dirLabels) {
+        if ($showHeaders -and -not $pipingOut) {
+            if ($sectionCount -gt 0) { Write-Host '' }
+            Write-Host "${dir}:"
+        }
+
+        $dirParams = @{
+            ErrorAction = 'SilentlyContinue'
+            LiteralPath = $dir
+        }
+        if ($showAll) { $dirParams.Force = $true }
+
+        $items = @(Get-ChildItem @dirParams)
+        if (-not $showAll) {
+            $items = @($items | Where-Object { $_.Name -notlike '.*' })
+        }
+        Write-LsItems -Items $items -LongFormat:$longFormat -HumanReadable:$humanReadable -PipingOut:$pipingOut
+        $sectionCount++
+    }
+}
+
+# 输出一组 ls 项：管道名 / 长列表 / 横向多列
+function Write-LsItems {
+    param(
+        [object[]]$Items,
+        [switch]$LongFormat,
+        [switch]$HumanReadable,
+        [switch]$PipingOut
+    )
+
+    if (-not $Items -or $Items.Count -eq 0) { return }
+
+    if ($PipingOut) {
+        foreach ($item in $Items) {
             $item.Name
         }
         return
     }
 
-    # --- 长列表模式：ls -l / -lh / -al / -alh ---
-    if ($longFormat) {
-        # 先格式化全部大小，按最长文本定列宽，避免固定宽度留白过多
-        $sizeTexts = @(foreach ($item in $items) {
+    if ($LongFormat) {
+        $sizeTexts = @(foreach ($item in $Items) {
             $sizeBytes = if ($item.PSIsContainer) { $null } else { $item.Length }
-            Format-FileSize -Bytes $sizeBytes -HumanReadable:$humanReadable
+            Format-FileSize -Bytes $sizeBytes -HumanReadable:$HumanReadable
         })
         $sizeWidth = 1
         foreach ($st in $sizeTexts) {
@@ -62,9 +133,8 @@ function ls-horizontal {
         }
 
         $i = 0
-        foreach ($item in $items) {
+        foreach ($item in $Items) {
             $rgb = Get-ItemColor $item
-            # Windows Mode：与 Linux 权限位同位置，如 d----- / -a---- / -ar---
             $modeText = if ($null -ne $item.Mode -and $item.Mode -ne '') { $item.Mode } else { '------' }
             $timeText = $item.LastWriteTime.ToString('yyyy-MM-dd HH:mm')
             $sizeText = $sizeTexts[$i].PadLeft($sizeWidth)
@@ -78,12 +148,8 @@ function ls-horizontal {
         return
     }
 
-    # --- 横向多列模式（默认）---
     $width = $Host.UI.RawUI.WindowSize.Width
-    # 其它策略保留，暂不调用：
-    # Format-LsHorizontalUniform -Items $items -Width $width
-    # Format-LsHorizontalPerColumn -Items $items -Width $width
-    Format-LsColumnMajor -Items $items -Width $width
+    Format-LsColumnMajor -Items $Items -Width $width
 }
 
 # 横向多列：全局最长文件名 +2 作为统一列宽（旧策略，暂不调用）
