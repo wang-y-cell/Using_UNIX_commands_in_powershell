@@ -10,7 +10,7 @@ function cp {
     $verbose = $flags -contains 'v'
 
     if ($paths.Count -lt 2) {
-        Write-Error 'cp: missing file operand'
+        Write-Host 'cp: missing file operand'
         return
     }
 
@@ -19,20 +19,20 @@ function cp {
 
     if ($sources.Count -gt 1) {
         if (-not (Test-Path -LiteralPath $dest) -or -not (Get-Item -LiteralPath $dest).PSIsContainer) {
-            Write-Error "cp: target '${dest}' is not a directory"
+            Write-Host "cp: target '${dest}' is not a directory"
             return
         }
     }
 
     foreach ($src in $sources) {
         if (-not (Test-Path -LiteralPath $src)) {
-            Write-Error "cp: cannot stat '${src}': No such file or directory"
+            Write-Host "cp: cannot stat '${src}': No such file or directory"
             continue
         }
 
         $srcItem = Get-Item -LiteralPath $src -Force
         if ($srcItem.PSIsContainer -and -not $recursive) {
-            Write-Error "cp: -r not specified; omitting directory '${src}'"
+            Write-Host "cp: -r not specified; omitting directory '${src}'"
             continue
         }
 
@@ -42,7 +42,7 @@ function cp {
                 Write-Host "'${src}' -> '${dest}'"
             }
         } catch {
-            Write-Error "cp: cannot copy '${src}' to '${dest}': $($_.Exception.Message)"
+            Write-Host "cp: cannot copy '${src}' to '${dest}': $($_.Exception.Message)"
         }
     }
 }
