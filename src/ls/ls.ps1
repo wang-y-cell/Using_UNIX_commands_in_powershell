@@ -115,7 +115,8 @@ function Write-LsItems {
 
     if (-not $Items -or $Items.Count -eq 0) { return }
 
-    if ($PipingOut) {
+    # 非长列表管道：一行一个文件名（与 Linux ls | … 一致）
+    if ($PipingOut -and -not $LongFormat) {
         foreach ($item in $Items) {
             $item.Name
         }
@@ -134,12 +135,19 @@ function Write-LsItems {
 
         $i = 0
         foreach ($item in $Items) {
-            $rgb = Get-ItemColor $item
             $modeText = if ($null -ne $item.Mode -and $item.Mode -ne '') { $item.Mode } else { '------' }
             $timeText = $item.LastWriteTime.ToString('yyyy-MM-dd HH:mm')
             $sizeText = $sizeTexts[$i].PadLeft($sizeWidth)
             $i++
+            $lineText = "$modeText  $timeText  $sizeText  $($item.Name)"
 
+            # 管道给 grep 等：输出完整长列表文本行（无 ANSI）
+            if ($PipingOut) {
+                Write-Output $lineText
+                continue
+            }
+
+            $rgb = Get-ItemColor $item
             Write-RGB -Text "$modeText  " -R $BLUE[0] -G $BLUE[1] -B $BLUE[2] -NoNewline
             Write-RGB -Text "$timeText  " -R $GRAY[0] -G $GRAY[1] -B $GRAY[2] -NoNewline
             Write-RGB -Text "$sizeText  " -R $DARK_GRAY[0] -G $DARK_GRAY[1] -B $DARK_GRAY[2] -NoNewline
