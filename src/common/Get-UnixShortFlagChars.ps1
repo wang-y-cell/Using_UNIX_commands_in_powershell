@@ -13,8 +13,8 @@ function Get-UnixShortFlagChars {
         $text = [string]$arg
         if ([string]::IsNullOrWhiteSpace($text)) { continue }
 
-        # 仅匹配短选项：-a / -al / -alh（单个 '-' + 字母）
-        if ($text -match '^-([a-zA-Z]+)$') {
+        # 短选项：-a / -al / -alh / -1（字母或数字；保留大小写以区分 -F/-f）
+        if ($text -match '^-([a-zA-Z0-9]+)$') {
             foreach ($ch in $Matches[1].ToCharArray()) {
                 $chars.Add([string]$ch)
             }
@@ -37,7 +37,7 @@ function Get-UnixPathArgs {
         if ($null -eq $arg) { continue }
         $text = [string]$arg
         if ([string]::IsNullOrWhiteSpace($text)) { continue } # 如果文本为空则返回
-        if ($text -match '^-([a-zA-Z]+)$') { continue } # 如果文本匹配短选项则返回
+        if ($text -match '^-([a-zA-Z0-9]+)$') { continue } # 短选项不当路径
         $paths.Add($text) # 将非参数放入列表
     }
 

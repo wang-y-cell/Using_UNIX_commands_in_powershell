@@ -70,7 +70,12 @@ function head {
         if ($headAbort -or $fromPipeline) { return }
 
         if ($files.Count -eq 0) {
-            Write-Error 'head: missing file operand'
+            $n = 0
+            foreach ($line in @(Read-UnixStdinLines)) {
+                if ($n -ge $lineCount) { break }
+                Write-Output $line
+                $n++
+            }
             return
         }
 

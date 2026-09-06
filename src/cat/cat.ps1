@@ -1,5 +1,5 @@
 # cat + $args
-# actually cat FILE... -n -b
+# 支持：cat [-nb] [FILE...]；无文件时读 stdin；- 表示 stdin
 Remove-Item -Force alias:cat -ErrorAction SilentlyContinue
 function cat {
     begin {
@@ -9,11 +9,11 @@ function cat {
 
         $numberAll = $flags -contains 'n'
         $numberNonBlank = $flags -contains 'b'
-        # -b 浼樺厛浜?-n锛堜笌 GNU cat 涓€鑷达級
         if ($numberNonBlank) { $numberAll = $false }
 
         $fromPipeline = $MyInvocation.ExpectingInput
-        # 鐢ㄥ搱甯岃〃淇濆瓨璁℃暟锛屼究浜?scriptblock 璺ㄤ綔鐢ㄥ煙閫掑
+        $hadError = $false
+        Set-UnixExitCode -Code 0
         $state = @{
             LineNo     = 0
             NonBlankNo = 0
@@ -37,7 +37,7 @@ function cat {
                 return
             }
             Write-Output $Line
-        }
+        }.GetNewClosure()
     }
 
     process {
@@ -47,25 +47,34 @@ function cat {
     }
 
     end {
-        if ($fromPipeline) { return }
+        if ($fromPipeline) {
+            if ($hadError) { Set-UnixExitCode -Code 1 }
+            return
+        }
 
         if ($files.Count -eq 0) {
-            Write-Error 'cat: missing file operand'
+            foreach ($line in @(Read-UnixStdinLines)) {
+                & $emit $line
+            }
             return
         }
 
         foreach ($file in $files) {
             if ($file -eq '-') {
-                Write-Error 'cat: reading stdin via `-` is not supported; pipe input instead'
+                foreach ($line in @(Read-UnixStdinLines)) {
+                    & $emit $line
+                }
                 continue
             }
             if (-not (Test-Path -LiteralPath $file)) {
                 Write-Error "cat: ${file}: No such file or directory"
+                $hadError = $true
                 continue
             }
             $item = Get-Item -LiteralPath $file -Force
             if ($item.PSIsContainer) {
                 Write-Error "cat: ${file}: Is a directory"
+                $hadError = $true
                 continue
             }
 
@@ -76,7 +85,10 @@ function cat {
             }
             catch {
                 Write-Error "cat: ${file}: $($_.Exception.Message)"
+                $hadError = $true
             }
         }
+
+        if ($hadError) { Set-UnixExitCode -Code 1 }
     }
 }

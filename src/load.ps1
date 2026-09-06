@@ -14,6 +14,8 @@ $script:UucipLoadOrder = @(
     'common\Get-UnixShortFlagChars.ps1'
     'common\Merge-UnixFlagLetters.ps1'
     'common\Expand-UnixGlob.ps1'
+    'common\Set-UnixExitCode.ps1'
+    'common\Read-UnixStdinLines.ps1'
     # 提示符
     'prompt\Format-PromptPath.ps1'
     'prompt\prompt.ps1'

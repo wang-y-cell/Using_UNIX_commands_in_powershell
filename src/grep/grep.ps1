@@ -1,159 +1,343 @@
 # grep（简单函数 + $args）
-# 支持：grep PATTERN [FILE...]、管道输入；短选项 -i/-v/-n/-F
-# 匹配片段以红色高亮（终端直接显示时；继续管道则纯文本）
-# 正则非法时回退为字面量（便于搜 F:\mingw 等 Windows 路径）
+# 支持：grep [OPTIONS] PATTERN [FILE...]、管道 / 无文件时读 stdin
+# 选项：-i -v -n -F（字面量）-c -w -l -o -H；-f FILE（从文件读模式）
+# 退出码：0 有匹配；1 无匹配；2 错误
 # 例：ls | grep txt
 #     grep -i error app.log
-#     echo $env:PATH | grep 'F:\mingw'
-#     Get-Content app.log | grep -n TODO
+#     echo $env:PATH | grep -F 'F:\mingw'
 function grep {
     begin {
-        $grepAbort = $false # 是否终止
-        $flags = @(Get-UnixShortFlagChars -Arguments $args | ForEach-Object { $_.ToLowerInvariant() })
+        $grepAbort = $false
+        $grepHadMatch = $false
+        $grepHadError = $false
+        Set-UnixExitCode -Code 0
+
+        $ignoreCase = $false
+        $invert = $false
+        $showLineNumber = $false
+        $fixedString = $false
+        $countOnly = $false
+        $wordRegexp = $false
+        $filesWithMatches = $false
+        $onlyMatching = $false
+        $withFilename = $false
+        $patternFile = $null
 
         $nonFlags = [System.Collections.Generic.List[string]]::new()
-        foreach ($arg in @($args)) {
-            if ($null -eq $arg) { continue }
-            $text = [string]$arg
-            # 允许模式为空白（如 grep ' '）；仅跳过真正的空字符串
-            if ($null -eq $text -or $text.Length -eq 0) { continue }
-            if ($text -match '^-([a-zA-Z]+)$') { continue }
+        $argv = @($args)
+        $i = 0
+        while ($i -lt $argv.Count) {
+            $text = if ($null -eq $argv[$i]) { '' } else { [string]$argv[$i] }
+            if ($text.Length -eq 0) { $i++; continue }
+
+            if ($text -ceq '-f') {
+                if ($i + 1 -ge $argv.Count) {
+                    Write-Error 'grep: option requires an argument -- f'
+                    $grepAbort = $true; $grepHadError = $true; Set-UnixExitCode -Code 2; return
+                }
+                $patternFile = [string]$argv[$i + 1]
+                $i += 2
+                continue
+            }
+            if ($text -match '^-([a-zA-Z0-9]+)$') {
+                foreach ($ch in $Matches[1].ToCharArray()) {
+                    switch -CaseSensitive ([string]$ch) {
+                        'i' { $ignoreCase = $true }
+                        'v' { $invert = $true }
+                        'n' { $showLineNumber = $true }
+                        'F' { $fixedString = $true }
+                        'c' { $countOnly = $true }
+                        'w' { $wordRegexp = $true }
+                        'l' { $filesWithMatches = $true }
+                        'o' { $onlyMatching = $true }
+                        'H' { $withFilename = $true }
+                        'f' {
+                            Write-Error 'grep: option requires an argument -- f'
+                            $grepAbort = $true; $grepHadError = $true; Set-UnixExitCode -Code 2; return
+                        }
+                        default {
+                            Write-Error "grep: invalid option -- '$ch'"
+                            $grepAbort = $true; $grepHadError = $true; Set-UnixExitCode -Code 2; return
+                        }
+                    }
+                }
+                $i++
+                continue
+            }
             $nonFlags.Add($text)
+            $i++
         }
 
-        if ($nonFlags.Count -eq 0) {
+        $patterns = [System.Collections.Generic.List[string]]::new()
+        if ($patternFile) {
+            if (-not (Test-Path -LiteralPath $patternFile)) {
+                Write-Error "grep: ${patternFile}: No such file or directory"
+                $grepAbort = $true; $grepHadError = $true; Set-UnixExitCode -Code 2; return
+            }
+            try {
+                foreach ($pline in [System.IO.File]::ReadLines((Get-Item -LiteralPath $patternFile -Force).FullName)) {
+                    $patterns.Add($pline)
+                }
+            } catch {
+                Write-Error "grep: ${patternFile}: $($_.Exception.Message)"
+                $grepAbort = $true; $grepHadError = $true; Set-UnixExitCode -Code 2; return
+            }
+        }
+
+        if ($nonFlags.Count -eq 0 -and $patterns.Count -eq 0) {
             Write-Error 'grep: missing pattern'
-            $grepAbort = $true
-            return
+            $grepAbort = $true; $grepHadError = $true; Set-UnixExitCode -Code 2; return
         }
 
-        $pattern = $nonFlags[0] # 模式
-        $files = if ($nonFlags.Count -gt 1) { # 文件
-            @($nonFlags.GetRange(1, $nonFlags.Count - 1)) # 获取除模式外的所有文件
+        $files = @()
+        if ($patterns.Count -gt 0) {
+            $files = @($nonFlags)
         } else {
-            @() # 如果没有文件，则返回空数组
+            $patterns.Add($nonFlags[0])
+            if ($nonFlags.Count -gt 1) {
+                $files = @($nonFlags.GetRange(1, $nonFlags.Count - 1))
+            }
         }
         $files = @(Expand-UnixGlob -Path $files)
 
-        $ignoreCase = $flags -contains 'i' # 忽略大小写
-        $invert = $flags -contains 'v' # 反转匹配
-        $showLineNumber = $flags -contains 'n' # 显示行号
-        $fixedString = $flags -contains 'f' # 固定字符串（字面量）
-        $fromPipeline = $MyInvocation.ExpectingInput # 是否从管道输入
-        $multiFile = $files.Count -gt 1 # 是否多文件
-        $pipeLineNo = 0 # 管道行号
-        # 继续向下游管道时不加颜色，避免污染后续命令
-        $colorize = $MyInvocation.PipelinePosition -ge $MyInvocation.PipelineLength
+        $fromPipeline = $MyInvocation.ExpectingInput
+        $multiFile = ($files.Count -gt 1) -or $withFilename
+        $pipeLineNo = 0
+        $pipeMatchCount = 0
+        $colorize = ($MyInvocation.PipelinePosition -ge $MyInvocation.PipelineLength) -and
+            (-not $countOnly) -and (-not $filesWithMatches)
 
-        $matchLine = $null
-        $grepRegex = $null
-        $grepWildcard = $null
-        $grepLiteral = $null
         $literalCmp = if ($ignoreCase) {
             [System.StringComparison]::OrdinalIgnoreCase
         } else {
             [System.StringComparison]::Ordinal
         }
 
-        if ($fixedString) {
-            $grepLiteral = $pattern
-            $matchLine = {
-                param([string]$Line)
-                $Line.IndexOf($grepLiteral, $literalCmp) -ge 0
-            }.GetNewClosure()
-        }
-        else {
-            # 优先按正则；非法则：通配符 → 通配整行；否则字面量（如 F:\mingw）
-            try {
+        $grepRegex = $null
+        $grepLiteral = $null
+        $matchMode = 'regex' # regex | literal
+
+        if ($fixedString -or ($patterns.Count -eq 1 -and $patterns[0].Length -eq 0)) {
+            $matchMode = 'literal'
+            $grepLiteral = $patterns[0]
+            if ($patterns.Count -gt 1) {
+                # 多字面量：合并为正则转义
+                $matchMode = 'regex'
+                $escaped = @($patterns | ForEach-Object { [regex]::Escape($_) })
+                $body = ($escaped -join '|')
+                if ($wordRegexp) { $body = "\b(?:$body)\b" }
                 $grepRegex = [regex]::new(
-                    $pattern,
-                    $(if ($ignoreCase) { [System.Text.RegularExpressions.RegexOptions]::IgnoreCase }
-                      else { [System.Text.RegularExpressions.RegexOptions]::None })
+                    $body,
+                    $(if ($ignoreCase) { [Text.RegularExpressions.RegexOptions]::IgnoreCase }
+                      else { [Text.RegularExpressions.RegexOptions]::None })
                 )
-                $matchLine = { param([string]$Line) $grepRegex.IsMatch($Line) }.GetNewClosure()
+            } elseif ($wordRegexp) {
+                $matchMode = 'regex'
+                $grepRegex = [regex]::new(
+                    ('\b' + [regex]::Escape($grepLiteral) + '\b'),
+                    $(if ($ignoreCase) { [Text.RegularExpressions.RegexOptions]::IgnoreCase }
+                      else { [Text.RegularExpressions.RegexOptions]::None })
+                )
+                $grepLiteral = $null
+            }
+        } else {
+            try {
+                $body = if ($patterns.Count -eq 1) { $patterns[0] } else { '(?:' + ($patterns -join ')|(?:') + ')' }
+                if ($wordRegexp) { $body = "\b(?:$body)\b" }
+                $grepRegex = [regex]::new(
+                    $body,
+                    $(if ($ignoreCase) { [Text.RegularExpressions.RegexOptions]::IgnoreCase }
+                      else { [Text.RegularExpressions.RegexOptions]::None })
+                )
             } catch {
-                if (Test-UnixGlobPattern -Pattern $pattern) {
-                    $wcOpts = [System.Management.Automation.WildcardOptions]::None
-                    if ($ignoreCase) {
-                        $wcOpts = [System.Management.Automation.WildcardOptions]::IgnoreCase
-                    }
-                    $grepWildcard = [System.Management.Automation.WildcardPattern]::new($pattern, $wcOpts)
-                    $matchLine = { param([string]$Line) $grepWildcard.IsMatch($Line) }.GetNewClosure()
-                }
-                else {
-                    $grepLiteral = $pattern
-                    $matchLine = {
-                        param([string]$Line)
-                        $Line.IndexOf($grepLiteral, $literalCmp) -ge 0
-                    }.GetNewClosure()
-                }
+                Write-Error "grep: invalid pattern: $($_.Exception.Message)"
+                $grepAbort = $true; $grepHadError = $true; Set-UnixExitCode -Code 2; return
             }
         }
+
+        $testMatch = {
+            param([string]$Line)
+            if ($matchMode -eq 'literal') {
+                return $Line.IndexOf($grepLiteral, $literalCmp) -ge 0
+            }
+            return $grepRegex.IsMatch($Line)
+        }.GetNewClosure()
     }
 
     process {
-        if ($grepAbort -or -not $fromPipeline) { return } # 如果终止或不是从管道输入，则返回
+        if ($grepAbort -or -not $fromPipeline) { return }
 
-        $pipeLineNo++ # 管道行号加1
-        $line = if ($_ -is [System.IO.FileSystemInfo]) { # 如果输入是文件系统信息
-            $_.Name # 则返回文件名
-        } elseif ($_ -is [string]) { # 如果输入是字符串
-            $_ # 则返回字符串
-        } else { # 否则
-            "$_" # 则返回字符串
+        $pipeLineNo++
+        $line = if ($_ -is [System.IO.FileSystemInfo]) {
+            $_.Name
+        } elseif ($_ -is [string]) {
+            $_
+        } else {
+            "$_"
         }
 
-        $matched = & $matchLine $line
+        $matched = & $testMatch $line
         if ($invert) { $matched = -not $matched }
         if (-not $matched) { return }
 
+        $grepHadMatch = $true
+        if ($countOnly) { $pipeMatchCount++; return }
+        if ($filesWithMatches) { return }
+
+        if ($onlyMatching -and -not $invert) {
+            Write-GrepOnlyMatching -Line $line -LineNo $pipeLineNo -FilePrefix '' `
+                -ShowLineNumber:$showLineNumber -Colorize:$colorize `
+                -Regex $grepRegex -Literal $grepLiteral -IgnoreCase:$ignoreCase
+            return
+        }
+
         $prefix = if ($showLineNumber) { "${pipeLineNo}:" } else { '' }
         Write-GrepLine -Line $line -Prefix $prefix -Colorize:$colorize -Invert:$invert `
-            -Regex $grepRegex -Wildcard $grepWildcard -Literal $grepLiteral -IgnoreCase:$ignoreCase
+            -Regex $grepRegex -Literal $grepLiteral -IgnoreCase:$ignoreCase
     }
 
     end {
-        if ($grepAbort -or $fromPipeline) { return }
+        if ($grepAbort) { return }
+
+        if ($fromPipeline) {
+            if ($countOnly) { Write-Output $pipeMatchCount }
+            if ($grepHadError) { Set-UnixExitCode -Code 2 }
+            elseif ($grepHadMatch) { Set-UnixExitCode -Code 0 }
+            else { Set-UnixExitCode -Code 1 }
+            return
+        }
 
         if ($files.Count -eq 0) {
-            Write-Error 'grep: no input (provide FILE or pipe data)'
+            $stdinLines = @(Read-UnixStdinLines)
+            $n = 0
+            $cnt = 0
+            foreach ($line in $stdinLines) {
+                $n++
+                $matched = & $testMatch $line
+                if ($invert) { $matched = -not $matched }
+                if (-not $matched) { continue }
+                $grepHadMatch = $true
+                if ($countOnly) { $cnt++; continue }
+                if ($filesWithMatches) { Write-Output '(standard input)'; break }
+                if ($onlyMatching -and -not $invert) {
+                    Write-GrepOnlyMatching -Line $line -LineNo $n -FilePrefix '' `
+                        -ShowLineNumber:$showLineNumber -Colorize:$colorize `
+                        -Regex $grepRegex -Literal $grepLiteral -IgnoreCase:$ignoreCase
+                    continue
+                }
+                $prefix = if ($showLineNumber) { "${n}:" } else { '' }
+                Write-GrepLine -Line $line -Prefix $prefix -Colorize:$colorize -Invert:$invert `
+                    -Regex $grepRegex -Literal $grepLiteral -IgnoreCase:$ignoreCase
+            }
+            if ($countOnly) { Write-Output $cnt }
+            if ($grepHadError) { Set-UnixExitCode -Code 2 }
+            elseif ($grepHadMatch) { Set-UnixExitCode -Code 0 }
+            else { Set-UnixExitCode -Code 1 }
             return
         }
 
         foreach ($file in $files) {
             if (-not (Test-Path -LiteralPath $file)) {
                 Write-Error "grep: ${file}: No such file or directory"
+                $grepHadError = $true
                 continue
             }
             $item = Get-Item -LiteralPath $file -Force
             if ($item.PSIsContainer) {
                 Write-Error "grep: ${file}: Is a directory"
+                $grepHadError = $true
                 continue
             }
 
             $lineNo = 0
+            $fileCount = 0
+            $fileMatched = $false
             try {
                 foreach ($line in [System.IO.File]::ReadLines($item.FullName)) {
                     $lineNo++
-                    $matched = & $matchLine $line
+                    $matched = & $testMatch $line
                     if ($invert) { $matched = -not $matched }
                     if (-not $matched) { continue }
 
-                    $prefix = ''
-                    if ($multiFile) { $prefix += "${file}:" }
-                    if ($showLineNumber) { $prefix += "${lineNo}:" }
+                    $grepHadMatch = $true
+                    $fileMatched = $true
+                    if ($countOnly) { $fileCount++; continue }
+                    if ($filesWithMatches) { Write-Output $file; break }
 
+                    $filePrefix = if ($multiFile) { "${file}:" } else { '' }
+                    if ($onlyMatching -and -not $invert) {
+                        Write-GrepOnlyMatching -Line $line -LineNo $lineNo -FilePrefix $filePrefix `
+                            -ShowLineNumber:$showLineNumber -Colorize:$colorize `
+                            -Regex $grepRegex -Literal $grepLiteral -IgnoreCase:$ignoreCase
+                        continue
+                    }
+
+                    $prefix = $filePrefix
+                    if ($showLineNumber) { $prefix += "${lineNo}:" }
                     Write-GrepLine -Line $line -Prefix $prefix -Colorize:$colorize -Invert:$invert `
-                        -Regex $grepRegex -Wildcard $grepWildcard -Literal $grepLiteral -IgnoreCase:$ignoreCase
+                        -Regex $grepRegex -Literal $grepLiteral -IgnoreCase:$ignoreCase
                 }
             } catch {
                 Write-Error "grep: ${file}: $($_.Exception.Message)"
+                $grepHadError = $true
             }
+
+            if ($countOnly) {
+                if ($multiFile) { Write-Output "${file}:${fileCount}" }
+                else { Write-Output $fileCount }
+            }
+        }
+
+        if ($grepHadError) { Set-UnixExitCode -Code 2 }
+        elseif ($grepHadMatch) { Set-UnixExitCode -Code 0 }
+        else { Set-UnixExitCode -Code 1 }
+    }
+}
+
+function Write-GrepOnlyMatching {
+    param(
+        [string]$Line,
+        [int]$LineNo,
+        [string]$FilePrefix,
+        [switch]$ShowLineNumber,
+        [switch]$Colorize,
+        [regex]$Regex,
+        [string]$Literal,
+        [switch]$IgnoreCase
+    )
+
+    $prefix = $FilePrefix
+    if ($ShowLineNumber) { $prefix += "${LineNo}:" }
+
+    $parts = [System.Collections.Generic.List[string]]::new()
+    if ($null -ne $Regex) {
+        foreach ($m in $Regex.Matches($Line)) {
+            if ($m.Length -gt 0) { $parts.Add($m.Value) }
+        }
+    } elseif (-not [string]::IsNullOrEmpty($Literal)) {
+        $cmp = if ($IgnoreCase) {
+            [System.StringComparison]::OrdinalIgnoreCase
+        } else {
+            [System.StringComparison]::Ordinal
+        }
+        $start = 0
+        while (($idx = $Line.IndexOf($Literal, $start, $cmp)) -ge 0) {
+            $parts.Add($Line.Substring($idx, $Literal.Length))
+            $start = $idx + $Literal.Length
+        }
+    }
+
+    foreach ($p in $parts) {
+        if ($Colorize) {
+            $red = "$([char]27)[38;2;$($RED[0]);$($RED[1]);$($RED[2])m"
+            $reset = "$([char]27)[0m"
+            Write-Output "${prefix}${red}${p}${reset}"
+        } else {
+            Write-Output "${prefix}${p}"
         }
     }
 }
 
-# 输出一行 grep 结果；Colorize 时把匹配片段标红
 function Write-GrepLine {
     param(
         [string]$Line,
@@ -161,7 +345,6 @@ function Write-GrepLine {
         [switch]$Colorize,
         [switch]$Invert,
         [regex]$Regex,
-        $Wildcard,
         [string]$Literal,
         [switch]$IgnoreCase
     )
@@ -206,8 +389,7 @@ function Write-GrepLine {
         return
     }
 
-    # 通配整行匹配：整行标红
-    Write-Host "${Prefix}${red}${Line}${reset}"
+    Write-Output "${Prefix}${Line}"
 }
 
 function Write-GrepColoredSpans {
@@ -220,7 +402,7 @@ function Write-GrepColoredSpans {
     )
 
     if (-not $Spans -or $Spans.Count -eq 0) {
-        Write-Host "${Prefix}${Line}"
+        Write-Output "${Prefix}${Line}"
         return
     }
 
@@ -239,5 +421,5 @@ function Write-GrepColoredSpans {
     if ($last -lt $Line.Length) {
         [void]$sb.Append($Line.Substring($last))
     }
-    Write-Host $sb.ToString()
+    Write-Output $sb.ToString()
 }

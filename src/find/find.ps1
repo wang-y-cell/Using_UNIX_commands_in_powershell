@@ -27,11 +27,13 @@ function find {
         $atime = $null
         $ctime = $null
         $size = $null
+        $maxDepth = $null
         $hasMtime = $false
         $hasMmin = $false
         $hasAtime = $false
         $hasCtime = $false
         $hasSize = $false
+        $hasMaxDepth = $false
         $findAbort = $false
 
         $i = 0
@@ -87,6 +89,19 @@ function find {
                 if ($i + 1 -ge $argv.Count) { Write-Error 'find: missing argument to `-size`'; $findAbort = $true; return }
                 $size = [string]$argv[$i + 1]
                 $hasSize = $true
+                $i += 2
+                continue
+            }
+            if ($tok -eq '-maxdepth') {
+                if ($i + 1 -ge $argv.Count) { Write-Error 'find: missing argument to `-maxdepth`'; $findAbort = $true; return }
+                $depthTok = [string]$argv[$i + 1]
+                if ($depthTok -notmatch '^\d+$') {
+                    Write-Error "find: Invalid argument `$depthTok' to `-maxdepth'"
+                    $findAbort = $true
+                    return
+                }
+                $maxDepth = [int]$depthTok
+                $hasMaxDepth = $true
                 $i += 2
                 continue
             }
@@ -183,11 +198,32 @@ function find {
             }
 
             $root = Get-Item -LiteralPath $path -Force
-            $items = @($root) + @(
-                Get-ChildItem -LiteralPath $path -Recurse -Force -ErrorAction SilentlyContinue
-            )
+            $items = [System.Collections.Generic.List[object]]::new()
+            $items.Add([pscustomobject]@{ Item = $root; Depth = 0 })
 
-            foreach ($item in $items) {
+            if (-not $hasMaxDepth -or $maxDepth -gt 0) {
+                $queue = [System.Collections.Generic.Queue[object]]::new()
+                if ($root.PSIsContainer) {
+                    $queue.Enqueue([pscustomobject]@{ Item = $root; Depth = 0 })
+                }
+                while ($queue.Count -gt 0) {
+                    $cur = $queue.Dequeue()
+                    $nextDepth = $cur.Depth + 1
+                    if ($hasMaxDepth -and $nextDepth -gt $maxDepth) { continue }
+                    try {
+                        $children = @(Get-ChildItem -LiteralPath $cur.Item.FullName -Force -ErrorAction SilentlyContinue)
+                    } catch { continue }
+                    foreach ($ch in $children) {
+                        $items.Add([pscustomobject]@{ Item = $ch; Depth = $nextDepth })
+                        if ($ch.PSIsContainer -and (-not $hasMaxDepth -or $nextDepth -lt $maxDepth)) {
+                            $queue.Enqueue([pscustomobject]@{ Item = $ch; Depth = $nextDepth })
+                        }
+                    }
+                }
+            }
+
+            foreach ($entry in $items) {
+                $item = $entry.Item
                 if ($typeKey) {
                     $isLink = Test-FindIsSymlink -Item $item
                     $isDir = $item.PSIsContainer -and -not $isLink

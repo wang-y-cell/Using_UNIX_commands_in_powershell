@@ -106,7 +106,20 @@ function tail {
         }
 
         if ($files.Count -eq 0) {
-            Write-Error 'tail: missing file operand'
+            if ($fromStart) {
+                $n = 0
+                foreach ($line in @(Read-UnixStdinLines)) {
+                    $n++
+                    if ($n -ge $lineCount) { Write-Output $line }
+                }
+            } else {
+                $q = [System.Collections.Generic.Queue[string]]::new()
+                foreach ($line in @(Read-UnixStdinLines)) {
+                    $q.Enqueue($line)
+                    while ($q.Count -gt $lineCount) { [void]$q.Dequeue() }
+                }
+                foreach ($line in $q) { Write-Output $line }
+            }
             return
         }
 

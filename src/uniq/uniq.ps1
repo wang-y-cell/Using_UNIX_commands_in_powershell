@@ -12,6 +12,7 @@ function uniq {
         $showCount = $flags -contains 'c'
         $ignoreCase = $flags -contains 'i'
         $onlyDuplicate = $flags -contains 'd'
+        $onlyUnique = $flags -contains 'u'
         $fromPipeline = $MyInvocation.ExpectingInput
 
         $state = @{
@@ -24,17 +25,18 @@ function uniq {
             param([string]$A, [string]$B)
             if ($ignoreCase) { return $A.Equals($B, [System.StringComparison]::OrdinalIgnoreCase) }
             return $A -ceq $B
-        }
+        }.GetNewClosure()
 
         $emitRun = {
             param([string]$Line, [int]$Count)
             if ($onlyDuplicate -and $Count -lt 2) { return }
+            if ($onlyUnique -and $Count -ne 1) { return }
             if ($showCount) {
                 Write-Output ("{0,7} {1}" -f $Count, $Line)
             } else {
                 Write-Output $Line
             }
-        }
+        }.GetNewClosure()
 
         $feed = {
             param([string]$Line)
@@ -51,7 +53,7 @@ function uniq {
             & $emitRun $state.Prev $state.Count
             $state.Prev = $Line
             $state.Count = 1
-        }
+        }.GetNewClosure()
     }
 
     process {
@@ -66,33 +68,36 @@ function uniq {
             return
         }
 
+        $inputs = @()
         if ($files.Count -eq 0) {
-            Write-Error 'uniq: missing file operand'
-            return
+            $inputs = @(@{ Kind = 'stdin'; Lines = @(Read-UnixStdinLines) })
+        } else {
+            foreach ($file in $files) {
+                if (-not (Test-Path -LiteralPath $file)) {
+                    Write-Error "uniq: ${file}: No such file or directory"
+                    continue
+                }
+                $item = Get-Item -LiteralPath $file -Force
+                if ($item.PSIsContainer) {
+                    Write-Error "uniq: ${file}: Is a directory"
+                    continue
+                }
+                try {
+                    $inputs += @{ Kind = 'file'; Lines = @([System.IO.File]::ReadLines($item.FullName)) }
+                } catch {
+                    Write-Error "uniq: ${file}: $($_.Exception.Message)"
+                }
+            }
         }
 
-        foreach ($file in $files) {
-            if (-not (Test-Path -LiteralPath $file)) {
-                Write-Error "uniq: ${file}: No such file or directory"
-                continue
-            }
-            $item = Get-Item -LiteralPath $file -Force
-            if ($item.PSIsContainer) {
-                Write-Error "uniq: ${file}: Is a directory"
-                continue
-            }
-
+        foreach ($inp in $inputs) {
             $state.HasPrev = $false
             $state.Prev = $null
             $state.Count = 0
-            try {
-                foreach ($line in [System.IO.File]::ReadLines($item.FullName)) {
-                    & $feed $line
-                }
-                if ($state.HasPrev) { & $emitRun $state.Prev $state.Count }
-            } catch {
-                Write-Error "uniq: ${file}: $($_.Exception.Message)"
+            foreach ($line in $inp.Lines) {
+                & $feed $line
             }
+            if ($state.HasPrev) { & $emitRun $state.Prev $state.Count }
         }
     }
 }

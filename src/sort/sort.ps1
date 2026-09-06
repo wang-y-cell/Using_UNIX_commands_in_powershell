@@ -23,25 +23,27 @@ function sort {
     end {
         if (-not $fromPipeline) {
             if ($files.Count -eq 0) {
-                Write-Error 'sort: missing file operand'
-                return
-            }
-            foreach ($file in $files) {
-                if (-not (Test-Path -LiteralPath $file)) {
-                    Write-Error "sort: open failed: ${file}: No such file or directory"
-                    continue
+                foreach ($line in @(Read-UnixStdinLines)) {
+                    $lines.Add($line)
                 }
-                $item = Get-Item -LiteralPath $file -Force
-                if ($item.PSIsContainer) {
-                    Write-Error "sort: read failed: ${file}: Is a directory"
-                    continue
-                }
-                try {
-                    foreach ($line in [System.IO.File]::ReadLines($item.FullName)) {
-                        $lines.Add($line)
+            } else {
+                foreach ($file in $files) {
+                    if (-not (Test-Path -LiteralPath $file)) {
+                        Write-Error "sort: open failed: ${file}: No such file or directory"
+                        continue
                     }
-                } catch {
-                    Write-Error "sort: ${file}: $($_.Exception.Message)"
+                    $item = Get-Item -LiteralPath $file -Force
+                    if ($item.PSIsContainer) {
+                        Write-Error "sort: read failed: ${file}: Is a directory"
+                        continue
+                    }
+                    try {
+                        foreach ($line in [System.IO.File]::ReadLines($item.FullName)) {
+                            $lines.Add($line)
+                        }
+                    } catch {
+                        Write-Error "sort: ${file}: $($_.Exception.Message)"
+                    }
                 }
             }
         }

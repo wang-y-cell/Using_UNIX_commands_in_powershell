@@ -67,8 +67,9 @@ function df {
     if ($usedH -lt 4) { $usedH = 4 }
     if ($availH -lt 5) { $availH = 5 }
 
+    $headerSize = if ($human) { 'Size' } else { '1K-blocks' }
     $header = "{0,-12} {1,$sizeH} {2,$usedH} {3,$availH} {4,4} {5}" -f `
-        'Filesystem', 'Size', 'Used', 'Avail', 'Use%', 'Mounted on'
+        'Filesystem', $headerSize, 'Used', 'Avail', 'Use%', 'Mounted on'
     Write-Output $header
 
     foreach ($r in $rows) {

@@ -1,5 +1,5 @@
 # tee + $args
-# actually .. | tee [-a] FILE...
+# 支持：.. | tee [-a] [FILE...]；无文件时仅复制到 stdout（对齐 GNU）
 Remove-Item -Force alias:tee -ErrorAction SilentlyContinue
 function tee {
     begin {
@@ -9,15 +9,12 @@ function tee {
         $append = $flags -contains 'a'
         $teeAbort = $false
         $writers = [System.Collections.Generic.List[System.IO.StreamWriter]]::new()
+        Set-UnixExitCode -Code 0
 
         if (-not $MyInvocation.ExpectingInput) {
             Write-Error 'tee: no input (pipe data into tee)'
             $teeAbort = $true
-            return
-        }
-        if ($files.Count -eq 0) {
-            Write-Error 'tee: missing file operand'
-            $teeAbort = $true
+            Set-UnixExitCode -Code 1
             return
         }
 
@@ -28,6 +25,7 @@ function tee {
                 if ($dir -and -not (Test-Path -LiteralPath $dir)) {
                     Write-Error "tee: ${file}: No such file or directory"
                     $teeAbort = $true
+                    Set-UnixExitCode -Code 1
                     break
                 }
                 $writer = [System.IO.StreamWriter]::new($file, $append, $utf8)
@@ -35,6 +33,7 @@ function tee {
             } catch {
                 Write-Error "tee: ${file}: $($_.Exception.Message)"
                 $teeAbort = $true
+                Set-UnixExitCode -Code 1
                 break
             }
         }

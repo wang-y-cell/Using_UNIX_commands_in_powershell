@@ -1,9 +1,5 @@
 # du（简单函数 + $args）
-# 支持：du [-ahs] [PATH...]
-# 例：du -sh .
-#     du -h .\src
-#     du -a .\src\common
-# 每扫完一项立即输出一行（固定宽度右对齐），避免长时间无反馈
+# 支持：du [-ahs] [PATH...]；默认递归列出各目录（对齐 GNU du）
 function du {
     $flags = @(Get-UnixShortFlagChars -Arguments $args | ForEach-Object { $_.ToLowerInvariant() })
     $paths = @(Get-UnixPathArgs -Arguments $args)
@@ -14,52 +10,80 @@ function du {
     $all = $flags -contains 'a'
     if ($paths.Count -eq 0) { $paths = @('.') }
 
-    # 人类可读较短，字节数最长约 15 位；固定宽度便于边扫边打仍对齐
     $sizeWidth = if ($human) { 8 } else { 12 }
+    $state = @{
+        HadError = $false
+        Cache    = @{}
+        Human    = $human
+        All      = $all
+        SizeWidth = $sizeWidth
+    }
+    Set-UnixExitCode -Code 0
 
-    $getSize = {
+    # 用 hashtable 挂接递归，避免 GetNewClosure 捕获到未赋值的脚本块
+    $state.GetSize = {
         param($Item)
+        $key = $Item.FullName
+        if ($state.Cache.ContainsKey($key)) { return [int64]$state.Cache[$key] }
+
         if ($Item.PSIsContainer) {
             $sum = [int64]0
-            try {
-                Get-ChildItem -LiteralPath $Item.FullName -Recurse -Force -File -ErrorAction SilentlyContinue |
-                    ForEach-Object { $sum += $_.Length }
-            } catch { }
+            Get-ChildItem -LiteralPath $Item.FullName -Force -ErrorAction SilentlyContinue | ForEach-Object {
+                $sum += [int64](& $state.GetSize $_)
+            }
+            $state.Cache[$key] = $sum
             return $sum
         }
-        return [int64]$Item.Length
-    }
+        $len = [int64]$Item.Length
+        $state.Cache[$key] = $len
+        return $len
+    }.GetNewClosure()
 
-    $emit = {
+    $state.Emit = {
         param([int64]$Bytes, [string]$Label)
-        $sizeText = Format-FileSize -Bytes $Bytes -HumanReadable:$human
-        Write-Output ("{0}  {1}" -f $sizeText.PadLeft($sizeWidth), $Label)
-    }
+        $sizeText = Format-FileSize -Bytes $Bytes -HumanReadable:$($state.Human)
+        Write-Output ("{0}  {1}" -f $sizeText.PadLeft($state.SizeWidth), $Label)
+    }.GetNewClosure()
+
+    $state.Walk = {
+        param($DirItem, [string]$Label)
+        try {
+            $children = @(Get-ChildItem -LiteralPath $DirItem.FullName -Force -ErrorAction Stop)
+        } catch {
+            Write-Error "du: cannot read directory '${Label}': $($_.Exception.Message)"
+            $state.HadError = $true
+            return (& $state.GetSize $DirItem)
+        }
+
+        foreach ($child in ($children | Sort-Object Name)) {
+            $childLabel = Join-Path $Label $child.Name
+            if ($child.PSIsContainer) {
+                $null = & $state.Walk $child $childLabel
+            } elseif ($state.All) {
+                & $state.Emit (& $state.GetSize $child) $childLabel
+            }
+        }
+
+        $bytes = & $state.GetSize $DirItem
+        & $state.Emit $bytes $Label
+        return $bytes
+    }.GetNewClosure()
 
     foreach ($path in $paths) {
         if (-not (Test-Path -LiteralPath $path)) {
             Write-Error "du: cannot access '${path}': No such file or directory"
+            $state.HadError = $true
             continue
         }
         $root = Get-Item -LiteralPath $path -Force
 
         if ($summarize -or -not $root.PSIsContainer) {
-            & $emit (& $getSize $root) $path
+            & $state.Emit (& $state.GetSize $root) $path
             continue
         }
 
-        try {
-            $children = @(Get-ChildItem -LiteralPath $root.FullName -Force -ErrorAction Stop)
-        } catch {
-            Write-Error "du: cannot read directory '${path}': $($_.Exception.Message)"
-            continue
-        }
-
-        foreach ($child in ($children | Sort-Object Name)) {
-            if (-not $all -and -not $child.PSIsContainer) { continue }
-            $label = Join-Path $path $child.Name
-            & $emit (& $getSize $child) $label
-        }
-        & $emit (& $getSize $root) $path
+        $null = & $state.Walk $root $path
     }
+
+    if ($state.HadError) { Set-UnixExitCode -Code 1 }
 }

@@ -63,7 +63,10 @@ function wc {
         }
 
         if ($files.Count -eq 0) {
-            Write-Error 'wc: missing file operand'
+            foreach ($line in @(Read-UnixStdinLines)) {
+                & $countLine $line $state
+            }
+            & $formatCounts $state.Lines $state.Words $state.Bytes ''
             return
         }
 

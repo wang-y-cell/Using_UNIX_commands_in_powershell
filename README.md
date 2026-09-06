@@ -225,10 +225,12 @@ windows@PS:F:\wy\Using_UNIX_commands_in_powershell $
 
 - 本项目是对常用 Linux 命令的**子集模拟**，并非完整 GNU coreutils / findutils。
 - `find` 的 `-ctime` 在 Windows 上用创建时间近似（系统无 Unix 语义上的 ctime）。
-- `ls` 颜色规则为简化版（目录 / 可执行脚本 / 压缩包 / 图片 / 其他）。
-- `ls` 直接显示时为彩色多列；接入管道时输出文件名，便于 `ls | grep`。
+- `ls` 颜色规则为简化版（目录 / 可执行脚本 / 压缩包 / 图片 / 其他）；权限列为 PowerShell Mode。
+- `ls` 直接显示时为彩色多列；管道时非 `-l` 输出文件名，`-l` 输出完整长列表行。
+- `grep` 非法正则会报错；搜含 `\` 的路径请用 `grep -F`。
 - `ln -s` 在 Windows 上创建符号链接通常需要管理员权限或开启开发者模式。
 - 部分命令会覆盖 PowerShell 自带别名（如 `ls`、`cat`、`mkdir`、`pwd`、`rm`、`cp`、`mv`、`sort`、`tee`、`clear`、`diff`）。若不需要，可卸载本项目。
+- 退出码可通过 `$LASTEXITCODE` 查看（如 `grep`/`diff`/`rm`）。
 
 ## 卸载
 

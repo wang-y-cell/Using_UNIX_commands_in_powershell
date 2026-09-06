@@ -7,9 +7,12 @@ function mv {
 
     $force = $flags -contains 'f'
     $verbose = $flags -contains 'v'
+    $hadError = $false
+    Set-UnixExitCode -Code 0
 
     if ($paths.Count -lt 2) {
         Write-Error 'mv: missing file operand'
+        Set-UnixExitCode -Code 1
         return
     }
 
@@ -19,6 +22,7 @@ function mv {
     if ($sources.Count -gt 1) {
         if (-not (Test-Path -LiteralPath $dest) -or -not (Get-Item -LiteralPath $dest).PSIsContainer) {
             Write-Error "mv: target '${dest}' is not a directory"
+            Set-UnixExitCode -Code 1
             return
         }
     }
@@ -26,16 +30,20 @@ function mv {
     foreach ($src in $sources) {
         if (-not (Test-Path -LiteralPath $src)) {
             Write-Error "mv: cannot stat '${src}': No such file or directory"
+            $hadError = $true
             continue
         }
 
         try {
             Move-Item -LiteralPath $src -Destination $dest -Force:$force -ErrorAction Stop
             if ($verbose) {
-                Write-Host "'${src}' -> '${dest}'"
+                Write-Output "'${src}' -> '${dest}'"
             }
         } catch {
             Write-Error "mv: cannot move '${src}' to '${dest}': $($_.Exception.Message)"
+            $hadError = $true
         }
     }
+
+    if ($hadError) { Set-UnixExitCode -Code 1 }
 }

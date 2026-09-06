@@ -1,17 +1,20 @@
 # 智能 ls（横向 / 长列表，支持组合参数）
-# 使用简单函数（无 param），未声明的 -al/-lh 等会进入 $args，再交给短选项解析
+# 选项：-a -A -l -h -1 -d -t -r（-h 仅在 -l 下生效，不单独开长列表）
 function ls-horizontal {
-    $flags = @(Get-UnixShortFlagChars -Arguments $args) # 获得短选项
-    $pathArgs = @(Get-UnixPathArgs -Arguments $args) # 获得路径参数
+    $flags = @(Get-UnixShortFlagChars -Arguments $args)
+    $flagLower = @($flags | ForEach-Object { $_.ToLowerInvariant() })
+    $pathArgs = @(Get-UnixPathArgs -Arguments $args)
     $hadPathArgs = $pathArgs.Count -gt 0
     $pathArgs = @(Expand-UnixGlob -Path $pathArgs)
 
-    # 用户传了路径/通配，但展开后为空 → 不回退到当前目录（避免 ls *.txt 列出全部）
+    $hadError = $false
+    Set-UnixExitCode -Code 0
+
+    # 用户传了路径/通配，但展开后为空 → 不回退到当前目录
     if ($hadPathArgs -and $pathArgs.Count -eq 0) {
         return
     }
 
-    # 路径不存在时按 Linux 风格报错，并只继续列出存在的项
     if ($pathArgs.Count -gt 0) {
         $existing = [System.Collections.Generic.List[string]]::new()
         foreach ($p in $pathArgs) {
@@ -19,103 +22,142 @@ function ls-horizontal {
                 $existing.Add($p)
             }
             else {
-                Write-Host "ls: cannot access '${p}': No such file or directory"
+                Write-Error "ls: cannot access '${p}': No such file or directory"
+                $hadError = $true
             }
         }
         $pathArgs = @($existing)
         if ($hadPathArgs -and $pathArgs.Count -eq 0) {
+            if ($hadError) { Set-UnixExitCode -Code 2 }
             return
         }
     }
 
-    $showAll = $flags -contains 'a' # 显示所有文件
-    $longFormat = $flags -contains 'l' # 长列表模式
-    $humanReadable = $flags -contains 'h' # 人类可读模式
+    $showAll = $flags -contains 'a'          # -a：显示隐藏（含 . / .. 语义）
+    $almostAll = $flags -contains 'A'        # -A：显示隐藏，但不含 . / ..
+    if ($showAll) { $almostAll = $false }   # -a 优先于 -A
 
-    # -h 仅在长列表中有意义；单独 -h 时按 -lh 处理
-    if ($humanReadable -and -not $longFormat) { 
-        # 如果人类可读模式为true，且长列表模式为false，则设置长列表模式为true
-        $longFormat = $true
-    }
+    $longFormat = $flagLower -contains 'l'
+    $humanReadable = $flagLower -contains 'h'
+    $onePerLine = $flags -contains '1'
+    $directoryOnly = $flagLower -contains 'd'
+    $sortByTime = $flagLower -contains 't'
+    $sortReverse = $flagLower -contains 'r'
+    # -h 不再偷偷开启 -l（对齐 GNU：无 -l 时 -h 无效果）
 
     $pipingOut = $MyInvocation.PipelinePosition -lt $MyInvocation.PipelineLength
+    if ($pipingOut -and -not $longFormat) { $onePerLine = $true }
 
-    $gciParams = @{
-        ErrorAction = 'SilentlyContinue'
-    }
-    if ($showAll) {
-        $gciParams.Force = $true
-    }
+    $gciForce = $showAll -or $almostAll -or ($flags -contains 'A')
 
-    # 无路径参数：列出当前目录（不加目录头）
-    if ($pathArgs.Count -eq 0) {
-        $items = @(Get-ChildItem @gciParams)
-        if (-not $showAll) {
-            $items = @($items | Where-Object { $_.Name -notlike '.*' })
+    $filterItems = {
+        param([object[]]$Items)
+        $list = @($Items)
+        if ($showAll) {
+            # 保留全部；Windows 的 Get-ChildItem 通常不含 . / ..
+        } elseif ($almostAll -or ($flags -contains 'A')) {
+            $list = @($list | Where-Object { $_.Name -ne '.' -and $_.Name -ne '..' })
+        } else {
+            $list = @($list | Where-Object { $_.Name -notlike '.*' })
         }
-        Write-LsItems -Items $items -LongFormat:$longFormat -HumanReadable:$humanReadable -PipingOut:$pipingOut
+
+        if ($sortByTime) {
+            $list = @($list | Sort-Object LastWriteTime -Descending)
+        } else {
+            $list = @($list | Sort-Object Name)
+        }
+        if ($sortReverse) {
+            [Array]::Reverse($list)
+        }
+        return $list
+    }.GetNewClosure()
+
+    # -d：把目录操作数本身当项列出，不进入
+    if ($directoryOnly) {
+        $items = [System.Collections.Generic.List[object]]::new()
+        if ($pathArgs.Count -eq 0) {
+            $items.Add((Get-Item -LiteralPath (Get-Location).Path -Force))
+        } else {
+            foreach ($p in $pathArgs) {
+                $it = Get-Item -LiteralPath $p -Force -ErrorAction SilentlyContinue
+                if ($it) { $items.Add($it) }
+            }
+        }
+        $items = & $filterItems @($items)
+        Write-LsItems -Items $items -LongFormat:$longFormat -HumanReadable:$humanReadable `
+            -PipingOut:$pipingOut -OnePerLine:$onePerLine
+        if ($hadError) { Set-UnixExitCode -Code 2 }
         return
     }
 
-    # 拆分文件 / 目录操作数（多目录时打印「路径:」头，与 Linux ls 一致）
+    if ($pathArgs.Count -eq 0) {
+        $gciParams = @{ ErrorAction = 'SilentlyContinue' }
+        if ($gciForce) { $gciParams.Force = $true }
+        $items = & $filterItems @(Get-ChildItem @gciParams)
+        Write-LsItems -Items $items -LongFormat:$longFormat -HumanReadable:$humanReadable `
+            -PipingOut:$pipingOut -OnePerLine:$onePerLine
+        if ($hadError) { Set-UnixExitCode -Code 2 }
+        return
+    }
+
     $fileItems = [System.Collections.Generic.List[object]]::new()
     $dirLabels = [System.Collections.Generic.List[string]]::new()
     foreach ($p in $pathArgs) {
         $item = Get-Item -LiteralPath $p -Force -ErrorAction SilentlyContinue
         if (-not $item) { continue }
-        if ($item.PSIsContainer) {
-            $dirLabels.Add($p)
-        }
-        else {
-            $fileItems.Add($item)
-        }
+        if ($item.PSIsContainer) { $dirLabels.Add($p) }
+        else { $fileItems.Add($item) }
     }
 
-    # 与 GNU ls 类似：操作数按名称排序后再输出
-    $fileItems = @($fileItems | Sort-Object -Property Name)
+    $fileItems = & $filterItems @($fileItems)
     $dirLabels = @($dirLabels | Sort-Object)
+    if ($sortReverse) { [Array]::Reverse($dirLabels) }
 
     $showHeaders = ($fileItems.Count + $dirLabels.Count) -gt 1
     $sectionCount = 0
 
     if ($fileItems.Count -gt 0) {
-        Write-LsItems -Items $fileItems -LongFormat:$longFormat -HumanReadable:$humanReadable -PipingOut:$pipingOut
+        Write-LsItems -Items $fileItems -LongFormat:$longFormat -HumanReadable:$humanReadable `
+            -PipingOut:$pipingOut -OnePerLine:$onePerLine
         $sectionCount++
     }
 
     foreach ($dir in $dirLabels) {
-        if ($showHeaders -and -not $pipingOut) {
-            if ($sectionCount -gt 0) { Write-Host '' }
-            Write-Host "${dir}:"
+        if ($showHeaders) {
+            if ($sectionCount -gt 0) {
+                if ($pipingOut) { Write-Output '' } else { Write-Host '' }
+            }
+            if ($pipingOut) { Write-Output "${dir}:" }
+            else { Write-Host "${dir}:" }
         }
 
         $dirParams = @{
             ErrorAction = 'SilentlyContinue'
             LiteralPath = $dir
         }
-        if ($showAll) { $dirParams.Force = $true }
+        if ($gciForce) { $dirParams.Force = $true }
 
-        $items = @(Get-ChildItem @dirParams)
-        if (-not $showAll) {
-            $items = @($items | Where-Object { $_.Name -notlike '.*' })
-        }
-        Write-LsItems -Items $items -LongFormat:$longFormat -HumanReadable:$humanReadable -PipingOut:$pipingOut
+        $items = & $filterItems @(Get-ChildItem @dirParams)
+        Write-LsItems -Items $items -LongFormat:$longFormat -HumanReadable:$humanReadable `
+            -PipingOut:$pipingOut -OnePerLine:$onePerLine
         $sectionCount++
     }
+
+    if ($hadError) { Set-UnixExitCode -Code 2 }
 }
 
-# 输出一组 ls 项：管道名 / 长列表 / 横向多列
+# 输出一组 ls 项：管道名 / 长列表 / 横向多列 / -1 单列
 function Write-LsItems {
     param(
         [object[]]$Items,
         [switch]$LongFormat,
         [switch]$HumanReadable,
-        [switch]$PipingOut
+        [switch]$PipingOut,
+        [switch]$OnePerLine
     )
 
     if (-not $Items -or $Items.Count -eq 0) { return }
 
-    # 非长列表管道：一行一个文件名（与 Linux ls | … 一致）
     if ($PipingOut -and -not $LongFormat) {
         foreach ($item in $Items) {
             $item.Name
@@ -141,7 +183,6 @@ function Write-LsItems {
             $i++
             $lineText = "$modeText  $timeText  $sizeText  $($item.Name)"
 
-            # 管道给 grep 等：输出完整长列表文本行（无 ANSI）
             if ($PipingOut) {
                 Write-Output $lineText
                 continue
@@ -151,6 +192,14 @@ function Write-LsItems {
             Write-RGB -Text "$modeText  " -R $BLUE[0] -G $BLUE[1] -B $BLUE[2] -NoNewline
             Write-RGB -Text "$timeText  " -R $GRAY[0] -G $GRAY[1] -B $GRAY[2] -NoNewline
             Write-RGB -Text "$sizeText  " -R $DARK_GRAY[0] -G $DARK_GRAY[1] -B $DARK_GRAY[2] -NoNewline
+            Write-RGB -Text $item.Name -R $rgb[0] -G $rgb[1] -B $rgb[2]
+        }
+        return
+    }
+
+    if ($OnePerLine) {
+        foreach ($item in $Items) {
+            $rgb = Get-ItemColor $item
             Write-RGB -Text $item.Name -R $rgb[0] -G $rgb[1] -B $rgb[2]
         }
         return
